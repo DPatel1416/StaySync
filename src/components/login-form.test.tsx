@@ -15,6 +15,18 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
     expect(screen.getByLabelText("Email address")).toHaveAttribute("type", "email");
     expect(screen.getByText("Forgot password?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
+  });
+
+  it("provides a new account-holder registration form", () => {
+    render(<LoginForm/>);
+    fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(screen.getByRole("heading", { name: "Create your hotel account" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Your full name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Organization name")).toBeInTheDocument();
+    expect(screen.getByLabelText("First property")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm password")).toBeInTheDocument();
   });
 
   it("supports a visible password toggle", () => {

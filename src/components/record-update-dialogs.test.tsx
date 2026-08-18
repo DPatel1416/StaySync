@@ -18,6 +18,12 @@ describe("Front Desk record updates", () => {
     expect(screen.getByText(/belongs to another department/i)).toBeInTheDocument();
   });
 
+  it("allows Maintenance to update a request assigned to Maintenance", () => {
+    render(<ServiceRequestEditor currentDepartment="Maintenance" request={{ id: "SR-1047", title: "Air conditioning not cooling", location: "Room 604", from: "Front Desk", assigned: "Maintenance", priority: "Urgent", status: "In Progress", due: "Overdue" }} onClose={vi.fn()} onSave={vi.fn()}/>);
+    expect(screen.getByLabelText("Status")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+  });
+
   it("does not let Front Desk update an incident assigned to Management", () => {
     render(<IncidentEditor currentDepartment="Front Desk" record={{ title: "INC-209 · Guest relocation", detail: "Room 604 · Assigned to Management", status: "Awaiting review", tone: "warning" }} onClose={vi.fn()} onSave={vi.fn()}/>);
     expect(screen.getByLabelText("Status")).toBeDisabled();

@@ -8,6 +8,16 @@
   --muted: 99 108 125;
   --border: 226 229 236;
   --brand: 79 70 229;
+  --brand-strong: 55 48 163;
+  --brand-soft: 238 242 255;
+  --brand-muted: 224 231 255;
+  --brand-border: 199 210 254;
+  --identity: 2 132 199;
+  --identity-strong: 3 105 161;
+  --identity-dark: 8 47 73;
+  --identity-soft: 240 249 255;
+  --identity-muted: 224 242 254;
+  --identity-border: 186 230 253;
   --sidebar-width: 248px;
   color-scheme: light;
 }
@@ -40,10 +50,49 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+.department-workspace {
+  background: linear-gradient(180deg, rgb(var(--brand-soft) / .72) 0, #f8f8fa 190px);
+}
 button, input, select, textarea { font: inherit; }
 a, button, input, select, textarea { outline: none; }
-:focus-visible { box-shadow: 0 0 0 3px rgba(79,70,229,.24); border-radius: .5rem; }
-::selection { background: #c7d2fe; color: #312e81; }
+:focus-visible { box-shadow: 0 0 0 3px rgb(var(--brand) / .24); border-radius: .5rem; }
+::selection { background: rgb(var(--brand-muted)); color: rgb(var(--brand-strong)); }
+
+[data-department-theme="front-desk"] {
+  --brand: 79 70 229;
+  --brand-strong: 55 48 163;
+  --brand-soft: 238 242 255;
+  --brand-muted: 224 231 255;
+  --brand-border: 199 210 254;
+}
+[data-department-theme="housekeeping"] {
+  --brand: 15 118 110;
+  --brand-strong: 17 94 89;
+  --brand-soft: 240 253 250;
+  --brand-muted: 204 251 241;
+  --brand-border: 153 246 228;
+}
+[data-department-theme="maintenance"] {
+  --brand: 180 83 9;
+  --brand-strong: 146 64 14;
+  --brand-soft: 255 251 235;
+  --brand-muted: 254 243 199;
+  --brand-border: 253 230 138;
+}
+[data-department-theme="manager"] {
+  --brand: 109 40 217;
+  --brand-strong: 91 33 182;
+  --brand-soft: 245 243 255;
+  --brand-muted: 237 233 254;
+  --brand-border: 221 214 254;
+}
+[data-login-theme="ocean"] {
+  --brand: var(--identity);
+  --brand-strong: var(--identity-strong);
+  --brand-soft: var(--identity-soft);
+  --brand-muted: var(--identity-muted);
+  --brand-border: var(--identity-border);
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }

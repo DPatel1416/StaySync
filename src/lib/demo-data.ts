@@ -35,8 +35,9 @@ export const workOrders = [
 ];
 
 export const attention = [
-  { label: "Overdue service requests", count: 3, detail: "Oldest overdue by 48 minutes", tone: "urgent" },
-  { label: "Payment discrepancies", count: 2, detail: "$184.50 awaiting review", tone: "warning" },
-  { label: "Lost & found follow-ups", count: 4, detail: "One pickup scheduled today", tone: "info" },
-  { label: "Incidents awaiting review", count: 1, detail: "Submitted yesterday at 10:24 PM", tone: "neutral" },
+  { label: "Guest follow-ups", count: 1, detail: "Room 604 relocation follow-up is due", tone: "urgent", department: "Front Desk", href: "/app/front-desk/service-requests?assigned=front-desk" },
+  { label: "Payment discrepancies", count: 2, detail: "$184.50 awaiting Front Desk review", tone: "warning", department: "Front Desk", href: "/app/front-desk/payment-issues?assigned=front-desk" },
+  { label: "Lost & found follow-ups", count: 4, detail: "One guest pickup scheduled today", tone: "info", department: "Front Desk", href: "/app/front-desk/lost-found?assigned=front-desk" },
+  { label: "Incidents awaiting review", count: 1, detail: "Assigned to Management", tone: "neutral", department: "Management", href: "/app/manager/incidents?assigned=management" },
+  { label: "Rooms waiting for clearance", count: 2, detail: "Assigned to Maintenance", tone: "warning", department: "Maintenance", href: "/app/maintenance/work-orders" },
 ];

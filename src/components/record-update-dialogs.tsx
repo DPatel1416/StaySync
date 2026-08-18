@@ -5,8 +5,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { LockKeyhole, X } from "lucide-react";
 import { Button } from "./ui/button";
 
-const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500";
-const textareaClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500";
+const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-brand disabled:bg-slate-50 disabled:text-slate-500";
+const textareaClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand disabled:bg-slate-50 disabled:text-slate-500";
 
 function Label({ children }: { children: React.ReactNode }) { return <span className="mb-1.5 block text-sm font-semibold text-slate-700">{children}</span>; }
 
@@ -16,9 +16,9 @@ function EditorFrame({ open, onClose, title, description, canEdit, canDelete = f
 }
 
 export type EditableRequest = { id: string; title: string; location: string; from: string; assigned: string; priority: string; status: string; due: string; createdAt?: number; createdBy?: string };
-export function ServiceRequestEditor({ request, onClose, onSave, onDelete }: { request: EditableRequest | null; onClose: () => void; onSave: (request: EditableRequest) => void; onDelete?: (request: EditableRequest) => void }) {
+export function ServiceRequestEditor({ request, currentDepartment = "Front Desk", onClose, onSave, onDelete }: { request: EditableRequest | null; currentDepartment?: string; onClose: () => void; onSave: (request: EditableRequest) => void; onDelete?: (request: EditableRequest) => void }) {
   if (!request) return null;
-  const canEdit = request.assigned === "Front Desk";
+  const canEdit = currentDepartment === "Management" || request.assigned === currentDepartment;
   const canDelete = (request.createdBy === "Alex Morgan" || request.createdBy === "You") && Boolean(request.createdAt && Date.now() - request.createdAt <= 10 * 60 * 1000);
   return <EditorFrame open title={`Update ${request.id}`} description="Change assignment, priority, or progress status. Updates are recorded in the activity timeline." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(request)} onClose={onClose} onSubmit={(data) => onSave({ ...request, assigned: String(data.get("department")), priority: String(data.get("priority")), status: String(data.get("status")), due: String(data.get("due")) || request.due })}>
     <div className="rounded-xl bg-slate-50 p-4"><p className="font-semibold text-slate-900">{request.title}</p><p className="mt-1 text-sm text-slate-500">{request.location} · Requested by {request.from}</p></div>
@@ -36,11 +36,11 @@ export function OperationLogEditor({ log, onClose, onSave, onDelete }: { log: Ed
   return <EditorFrame open title="Edit Operations Log entry" description="You can edit entries you authored. Deletion is available for 10 minutes after posting." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(log)} onClose={onClose} onSubmit={(data) => onSave({ ...log, message: String(data.get("message")), sharedWith: String(data.get("sharedWith")) ? [String(data.get("sharedWith"))] : [], priority: String(data.get("priority")), pinned: data.get("pinned") === "on" })}>
     <label><Label>Update</Label><textarea name="message" required rows={4} defaultValue={log.message} disabled={!canEdit} className={textareaClass}/></label>
     <div className="grid gap-4 sm:grid-cols-2"><label><Label>Share with another department</Label><select name="sharedWith" defaultValue={log.sharedWith?.[0] ?? ""} disabled={!canEdit} className={inputClass}><option value="">Department only</option><option>Front Desk</option><option>Maintenance</option><option>Housekeeping</option><option>Kitchen</option><option>Management</option></select></label><label><Label>Priority</Label><select name="priority" defaultValue={log.priority} disabled={!canEdit} className={inputClass}><option>Standard</option><option>Important</option><option>Urgent</option></select></label></div>
-    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="pinned" type="checkbox" defaultChecked={log.pinned} disabled={!canEdit} className="size-4 rounded border-slate-300 text-indigo-600"/>Pin this entry</label>
+    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="pinned" type="checkbox" defaultChecked={log.pinned} disabled={!canEdit} className="size-4 rounded border-slate-300 text-brand"/>Pin this entry</label>
   </EditorFrame>;
 }
 
-export type EditableOperationalRecord = { title: string; detail: string; status: string; tone: "neutral" | "info" | "success" | "warning" | "urgent"; createdAt?: number; createdBy?: string };
+export type EditableOperationalRecord = { title: string; detail: string; status: string; tone: "neutral" | "info" | "success" | "warning" | "urgent"; room?: string; foundAt?: string; foundLocation?: string; storageLocation?: string; createdAt?: number; createdBy?: string };
 export function IncidentEditor({ record, currentDepartment, onClose, onSave, onDelete }: { record: EditableOperationalRecord | null; currentDepartment: string; onClose: () => void; onSave: (record: EditableOperationalRecord) => void; onDelete?: (record: EditableOperationalRecord) => void }) {
   if (!record) return null;
   const assignedDepartment = record.detail.match(/Assigned to ([^·]+)$/)?.[1]?.trim() ?? "Management";
@@ -53,9 +53,9 @@ export function IncidentEditor({ record, currentDepartment, onClose, onSave, onD
 
 export function LostFoundEditor({ record, onClose, onSave, onDelete }: { record: EditableOperationalRecord | null; onClose: () => void; onSave: (record: EditableOperationalRecord) => void; onDelete?: (record: EditableOperationalRecord) => void }) {
   if (!record) return null;
-  const stored = record.detail.match(/Stored in (.*)$/)?.[1] ?? "";
+  const stored = record.storageLocation ?? record.detail.match(/Stored in (.*)$/)?.[1] ?? "";
   const canDelete = (record.createdBy === "Alex Morgan" || record.createdBy === "You") && Boolean(record.createdAt && Date.now() - record.createdAt <= 10 * 60 * 1000);
-  return <EditorFrame open title="Update lost and found item" description="Update secure storage and guest pickup or shipping progress." canEdit canDelete={canDelete} onDelete={() => onDelete?.(record)} onClose={onClose} onSubmit={(data) => onSave({ ...record, detail: record.detail.replace(/Stored in .*$/, `Stored in ${String(data.get("storage"))}`), status: String(data.get("status")), tone: String(data.get("status")) === "Returned to guest" ? "success" : "info" })}>
-    <div className="rounded-xl bg-slate-50 p-4 font-semibold text-slate-900">{record.title}</div><label><Label>Storage location</Label><input name="storage" required defaultValue={stored} className={inputClass}/></label><label><Label>Follow-up status</Label><select name="status" defaultValue={record.status} className={inputClass}><option>Not started</option><option>Guest contacted</option><option>Pickup arranged</option><option>Shipping arranged</option><option>Returned to guest</option><option>Disposed per policy</option></select></label><label><Label>Handling note</Label><textarea name="note" rows={3} className={textareaClass} placeholder="Add pickup, shipping, or disposition details."/></label>
+  return <EditorFrame open title="Update lost and found item" description="Update guest-room details, secure storage, and pickup or shipping progress." canEdit canDelete={canDelete} onDelete={() => onDelete?.(record)} onClose={onClose} onSubmit={(data) => { const storage = String(data.get("storage")); const foundLocation = String(data.get("foundLocation")); const room = String(data.get("room")); const foundAt = String(data.get("foundAt")); onSave({ ...record, room, foundAt, foundLocation, storageLocation: storage, detail: `Found in ${foundLocation}${room ? ` · Room ${room}` : ""} · Found ${foundAt} · Stored in ${storage}`, status: String(data.get("status")), tone: String(data.get("status")) === "Returned to guest" ? "success" : "info" }); }}>
+    <div className="rounded-xl bg-slate-50 p-4 font-semibold text-slate-900">{record.title}</div><div className="grid gap-4 sm:grid-cols-2"><label><Label>Guest room number</Label><input name="room" inputMode="numeric" defaultValue={record.room ?? ""} className={inputClass}/></label><label><Label>Found date and time</Label><input name="foundAt" type="datetime-local" required defaultValue={record.foundAt ?? ""} className={inputClass}/></label></div><label><Label>Found location</Label><input name="foundLocation" required defaultValue={record.foundLocation ?? record.detail.match(/Found in ([^·]+)/)?.[1]?.trim() ?? ""} className={inputClass}/></label><label><Label>Storage location</Label><input name="storage" required defaultValue={stored} className={inputClass}/></label><label><Label>Follow-up status</Label><select name="status" defaultValue={record.status} className={inputClass}><option>Not started</option><option>Guest contacted</option><option>Pickup arranged</option><option>Shipping arranged</option><option>Returned to guest</option><option>Disposed per policy</option></select></label><label><Label>Handling note</Label><textarea name="note" rows={3} className={textareaClass} placeholder="Add pickup, shipping, or disposition details."/></label>
   </EditorFrame>;
 }

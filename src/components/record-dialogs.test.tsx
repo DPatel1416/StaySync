@@ -30,6 +30,8 @@ describe("Front Desk creation workflows", () => {
 
   it("asks for secure storage details instead of priority or assignment in Lost & Found", () => {
     render(<LostFoundDialog defaultOpen onCreate={vi.fn()}/>);
+    expect(screen.getByLabelText("Guest room number")).toBeInTheDocument();
+    expect(screen.getByLabelText("Found date and time *")).toBeInTheDocument();
     expect(screen.getByLabelText("Storage location *")).toBeInTheDocument();
     expect(screen.getByLabelText("Guest follow-up status *")).toBeInTheDocument();
     expect(screen.queryByLabelText(/priority/i)).not.toBeInTheDocument();

@@ -6,7 +6,7 @@ const tones = {
   success: "bg-emerald-50 text-emerald-700",
   warning: "bg-amber-50 text-amber-800",
   urgent: "bg-rose-50 text-rose-700",
-  brand: "bg-indigo-50 text-indigo-700",
+  brand: "bg-brand-soft text-brand-strong",
 };
 
 export function Badge({ children, tone = "neutral", className }: { children: React.ReactNode; tone?: keyof typeof tones; className?: string }) {

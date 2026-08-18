@@ -1,6 +1,36 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ModulePage } from "./module-pages";
+import { getDepartmentNotifications } from "@/lib/notification-store";
+
+describe("Service Request reminders", () => {
+  it("lets Front Desk notify the assigned department again", () => {
+    const before = getDepartmentNotifications().length;
+    render(<ModulePage role="front-desk" module="service-requests"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Notify Maintenance again about SR-1047" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Reminder sent to Maintenance for SR-1047");
+    expect(getDepartmentNotifications()).toHaveLength(before + 1);
+    expect(getDepartmentNotifications()[0]).toEqual(expect.objectContaining({ department: "Maintenance", serviceRequestId: "SR-1047" }));
+  });
+
+  it("does not show reminder actions outside Front Desk or on completed requests", () => {
+    const frontDesk = render(<ModulePage role="front-desk" module="service-requests"/>);
+    expect(screen.queryByRole("button", { name: /Notify Housekeeping again about SR-1045/ })).not.toBeInTheDocument();
+    frontDesk.unmount();
+    render(<ModulePage role="maintenance" module="service-requests"/>);
+    expect(screen.queryByRole("button", { name: /Notify .* again about/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Account settings", () => {
+  it("opens personal account settings and saves profile changes", () => {
+    render(<ModulePage role="front-desk" module="settings"/>);
+    expect(screen.getByRole("heading", { name: "Account settings" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("alex.morgan")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Profile saved");
+  });
+});
 
 describe("Operations Log conversations", () => {
   it("shows department entries and entries explicitly shared with Front Desk", () => {
