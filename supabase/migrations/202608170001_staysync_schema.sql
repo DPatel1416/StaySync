@@ -56,7 +56,7 @@ create table public.incidents (
 );
 create table public.operation_logs (
   id uuid primary key default gen_random_uuid(), organization_id uuid not null references public.organizations, property_id uuid not null references public.properties,
-  department_id uuid references public.departments, author_id uuid not null references public.users, content text not null,
+  department_id uuid not null references public.departments, shared_department_ids uuid[] not null default '{}', author_id uuid not null references public.users, content text not null,
   priority public.priority_level not null default 'STANDARD', is_pinned boolean not null default false, expires_at timestamptz,
   created_by uuid not null references public.users, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), archived_at timestamptz
 );
@@ -121,6 +121,7 @@ create table public.notifications (
 
 create index service_requests_scope_idx on public.service_requests (organization_id, property_id, status, created_at desc) where archived_at is null;
 create index operation_logs_scope_idx on public.operation_logs (organization_id, property_id, is_pinned desc, created_at desc) where archived_at is null;
+create index operation_logs_shared_departments_idx on public.operation_logs using gin (shared_department_ids) where archived_at is null;
 create index work_orders_assignee_idx on public.work_orders (property_id, assigned_user_id, status) where archived_at is null;
 create index room_updates_property_idx on public.room_status_updates (property_id, effective_at desc) where archived_at is null;
 create index activity_entity_idx on public.activity_events (entity_type, entity_id, created_at);
@@ -130,6 +131,7 @@ create or replace function public.touch_updated_at() returns trigger language pl
 do $$ declare t text; begin foreach t in array array['organizations','properties','departments','users','roles','service_requests','incidents','operation_logs','operation_log_replies','room_status_updates','work_orders','lost_found_items','payment_discrepancies','department_scores','saved_report_templates'] loop execute format('create trigger touch_updated_at before update on public.%I for each row execute function public.touch_updated_at()', t); end loop; end $$;
 
 create or replace function public.current_organization_id() returns uuid language sql stable security definer set search_path = public as $$ select organization_id from public.users where id = auth.uid() and is_active and archived_at is null $$;
+create or replace function public.current_department_id() returns uuid language sql stable security definer set search_path = public as $$ select department_id from public.users where id = auth.uid() and is_active and archived_at is null $$;
 create or replace function public.has_property_access(target_property uuid) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.user_properties where user_id = auth.uid() and property_id = target_property) $$;
 create or replace function public.has_permission(permission_code text, target_property uuid) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.user_properties up join public.role_permissions rp on rp.role_id = up.role_id join public.permissions p on p.id = rp.permission_id where up.user_id = auth.uid() and up.property_id = target_property and p.code = permission_code) $$;
 create or replace function public.employee_login_identity(login_username text) returns text language sql stable security definer set search_path = public, auth as $$ select au.email from public.users u join auth.users au on au.id = u.id where lower(u.username::text) = lower(login_username) and u.account_kind = 'EMPLOYEE' and u.is_active and u.archived_at is null limit 1 $$;
@@ -154,15 +156,36 @@ create policy role_read on public.roles for select using (organization_id is nul
 create policy permission_read on public.permissions for select using (auth.uid() is not null);
 create policy role_permission_read on public.role_permissions for select using (auth.uid() is not null);
 
-do $$ declare t text; begin foreach t in array array['service_requests','incidents','operation_logs','operation_log_replies','room_status_updates','work_orders','lost_found_items','payment_discrepancies','department_scores','activity_events','attachments','saved_report_templates','notifications'] loop execute format('alter table public.%I enable row level security', t); execute format('create policy tenant_property_read on public.%I for select using (organization_id = public.current_organization_id() and public.has_property_access(property_id))', t); end loop; end $$;
+do $$ declare t text; begin foreach t in array array['service_requests','incidents','room_status_updates','work_orders','lost_found_items','payment_discrepancies','department_scores','activity_events','attachments','saved_report_templates','notifications'] loop execute format('alter table public.%I enable row level security', t); execute format('create policy tenant_property_read on public.%I for select using (organization_id = public.current_organization_id() and public.has_property_access(property_id))', t); end loop; end $$;
+
+alter table public.operation_logs enable row level security;
+alter table public.operation_log_replies enable row level security;
+create policy operation_log_department_read on public.operation_logs for select using (
+  organization_id = public.current_organization_id() and public.has_property_access(property_id) and
+  (department_id = public.current_department_id() or shared_department_ids @> array[public.current_department_id()] or public.has_permission('VIEW_REPORTS', property_id))
+);
+create policy operation_log_reply_department_read on public.operation_log_replies for select using (
+  exists (select 1 from public.operation_logs log where log.id = operation_log_id)
+);
+create policy operation_log_reply_create on public.operation_log_replies for insert with check (
+  organization_id = public.current_organization_id() and public.has_property_access(property_id) and author_id = auth.uid() and
+  exists (select 1 from public.operation_logs log where log.id = operation_log_id)
+);
 
 create policy service_request_create on public.service_requests for insert with check (organization_id = public.current_organization_id() and public.has_permission('CREATE_SERVICE_REQUEST', property_id) and created_by = auth.uid());
 create policy service_request_update on public.service_requests for update using (public.has_permission('ASSIGN_SERVICE_REQUEST', property_id) or created_by = auth.uid()) with check (organization_id = public.current_organization_id());
 create policy operation_log_create on public.operation_logs for insert with check (organization_id = public.current_organization_id() and public.has_permission('CREATE_OPERATION_LOG', property_id) and author_id = auth.uid() and created_by = auth.uid());
+create policy operation_log_author_delete_10m on public.operation_logs for delete using (author_id = auth.uid() and created_at >= now() - interval '10 minutes');
 create policy room_update_create on public.room_status_updates for insert with check (organization_id = public.current_organization_id() and public.has_permission('UPDATE_ROOM_STATUS', property_id) and created_by = auth.uid());
 create policy work_order_create on public.work_orders for insert with check (organization_id = public.current_organization_id() and public.has_permission('CREATE_WORK_ORDER', property_id) and created_by = auth.uid());
 create policy score_manage on public.department_scores for all using (public.has_permission('MANAGE_DEPARTMENT_SCORE', property_id)) with check (organization_id = public.current_organization_id() and public.has_permission('MANAGE_DEPARTMENT_SCORE', property_id));
 create policy notification_own on public.notifications for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy attachment_metadata_create on public.attachments for insert with check (
+  organization_id = public.current_organization_id() and public.has_property_access(property_id) and uploaded_by = auth.uid()
+);
+create policy service_request_author_delete_10m on public.service_requests for delete using (created_by = auth.uid() and created_at >= now() - interval '10 minutes');
+create policy incident_author_delete_10m on public.incidents for delete using (created_by = auth.uid() and created_at >= now() - interval '10 minutes');
+create policy lost_found_author_delete_10m on public.lost_found_items for delete using (created_by = auth.uid() and created_at >= now() - interval '10 minutes');
 
 alter publication supabase_realtime add table public.service_requests, public.operation_logs, public.room_status_updates, public.work_orders, public.notifications;
 

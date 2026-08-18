@@ -11,7 +11,7 @@ import type { WorkspaceRole } from "@/lib/permissions";
 
 const nav = {
   "front-desk": [
-    ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["Service Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Lost & Found", "lost-found", PackageSearch], ["Payment Issues", "payment-issues", FileChartColumn],
+    ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["Room Updates", "room-updates", CircleGauge], ["Service Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Lost & Found", "lost-found", PackageSearch], ["Payment Issues", "payment-issues", FileChartColumn],
   ],
   housekeeping: [
     ["Overview", "", Home], ["Room Updates", "room-updates", CircleGauge], ["Assigned Rooms", "assigned-rooms", ClipboardList], ["Operations Log", "operations-log", BookOpenText], ["Service Requests", "service-requests", Wrench],

@@ -8,12 +8,13 @@ export const workspaceNames: Record<WorkspaceRole, string> = {
 };
 
 export const latestLogs = [
-  { id: "log-1", author: "Maya Chen", department: "Management", time: "9:42 AM", message: "VIP group arriving at 3:00 PM. Welcome amenities are staged; Front Desk to notify Housekeeping when rooms are released.", priority: "Important", pinned: true },
-  { id: "log-2", author: "Alex Morgan", department: "Front Desk", time: "8:18 AM", message: "Room 604 remains out of service until Maintenance clears the AC repair.", priority: "Urgent", pinned: false },
-  { id: "log-3", author: "Jordan Lee", department: "Maintenance", time: "Yesterday, 6:05 PM", message: "East elevator returned to service after inspection.", priority: "Standard", pinned: false },
+  { id: "log-1", author: "Maya Chen", department: "Management", sharedWith: ["Front Desk", "Housekeeping"], time: "9:42 AM", message: "VIP group arriving at 3:00 PM. Welcome amenities are staged; Front Desk to notify Housekeeping when rooms are released.", priority: "Important", pinned: true },
+  { id: "log-2", author: "Alex Morgan", department: "Front Desk", sharedWith: ["Maintenance"], time: "8:18 AM", message: "Room 604 remains out of service until Maintenance clears the AC repair.", priority: "Urgent", pinned: false },
+  { id: "log-3", author: "Jordan Lee", department: "Maintenance", sharedWith: [], time: "Yesterday, 6:05 PM", message: "East elevator returned to service after inspection.", priority: "Standard", pinned: false },
 ];
 
 export const serviceRequests = [
+  { id: "SR-1049", title: "Confirm guest relocation follow-up", location: "Room 604", from: "Management", assigned: "Front Desk", priority: "High", status: "Assigned", due: "11:30 AM" },
   { id: "SR-1048", title: "Extra towels requested", location: "Room 718", from: "Front Desk", assigned: "Housekeeping", priority: "Standard", status: "Assigned", due: "10:30 AM" },
   { id: "SR-1047", title: "Air conditioning not cooling", location: "Room 604", from: "Front Desk", assigned: "Maintenance", priority: "Urgent", status: "In Progress", due: "Overdue" },
   { id: "SR-1046", title: "Meeting room temperature", location: "Maple Room", from: "Events", assigned: "Maintenance", priority: "High", status: "Open", due: "11:00 AM" },

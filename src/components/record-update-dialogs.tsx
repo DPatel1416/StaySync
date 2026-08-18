@@ -1,0 +1,61 @@
+"use client";
+
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { LockKeyhole, X } from "lucide-react";
+import { Button } from "./ui/button";
+
+const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500";
+const textareaClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500";
+
+function Label({ children }: { children: React.ReactNode }) { return <span className="mb-1.5 block text-sm font-semibold text-slate-700">{children}</span>; }
+
+function EditorFrame({ open, onClose, title, description, canEdit, canDelete = false, children, onSubmit, onDelete }: { open: boolean; onClose: () => void; title: string; description: string; canEdit: boolean; canDelete?: boolean; children: React.ReactNode; onSubmit: (data: FormData) => void; onDelete?: () => void }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  return <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6"><div className="flex items-start justify-between gap-4"><div><Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">{title}</Dialog.Title><Dialog.Description className="mt-1 text-sm text-slate-500">{description}</Dialog.Description></div><Dialog.Close className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div>{!canEdit && <div className="mt-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><LockKeyhole className="mt-0.5 size-4 shrink-0"/><p>This record belongs to another department. You can view it, but only the assigned department or an authorized manager can update it.</p></div>}<form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); if (!canEdit) return; onSubmit(new FormData(event.currentTarget)); onClose(); }}>{children}{confirmingDelete && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Delete this record permanently? This action cannot be undone.</div>}<div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">{canDelete && <Button type="button" variant="danger" className="mr-auto" onClick={() => { if (confirmingDelete) { onDelete?.(); onClose(); } else setConfirmingDelete(true); }}>{confirmingDelete ? "Confirm delete" : "Delete"}</Button>}<Dialog.Close asChild><Button type="button" variant="secondary">Close</Button></Dialog.Close>{canEdit && <Button type="submit">Save changes</Button>}</div></form></Dialog.Content></Dialog.Portal></Dialog.Root>;
+}
+
+export type EditableRequest = { id: string; title: string; location: string; from: string; assigned: string; priority: string; status: string; due: string; createdAt?: number; createdBy?: string };
+export function ServiceRequestEditor({ request, onClose, onSave, onDelete }: { request: EditableRequest | null; onClose: () => void; onSave: (request: EditableRequest) => void; onDelete?: (request: EditableRequest) => void }) {
+  if (!request) return null;
+  const canEdit = request.assigned === "Front Desk";
+  const canDelete = (request.createdBy === "Alex Morgan" || request.createdBy === "You") && Boolean(request.createdAt && Date.now() - request.createdAt <= 10 * 60 * 1000);
+  return <EditorFrame open title={`Update ${request.id}`} description="Change assignment, priority, or progress status. Updates are recorded in the activity timeline." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(request)} onClose={onClose} onSubmit={(data) => onSave({ ...request, assigned: String(data.get("department")), priority: String(data.get("priority")), status: String(data.get("status")), due: String(data.get("due")) || request.due })}>
+    <div className="rounded-xl bg-slate-50 p-4"><p className="font-semibold text-slate-900">{request.title}</p><p className="mt-1 text-sm text-slate-500">{request.location} · Requested by {request.from}</p></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label>Status</Label><select name="status" defaultValue={request.status} disabled={!canEdit} className={inputClass}><option>Open</option><option>Assigned</option><option>In Progress</option><option>Waiting</option><option>Completed</option><option>Cancelled</option></select></label><label><Label>Assigned department</Label><select name="department" defaultValue={request.assigned} disabled={!canEdit} className={inputClass}><option>Front Desk</option><option>Housekeeping</option><option>Maintenance</option><option>Kitchen</option><option>Management</option></select></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label>Priority</Label><select name="priority" defaultValue={request.priority} disabled={!canEdit} className={inputClass}><option>Standard</option><option>Important</option><option>High</option><option>Urgent</option></select></label><label><Label>Due</Label><input name="due" defaultValue={request.due} disabled={!canEdit} className={inputClass}/></label></div>
+    <label><Label>Update note</Label><textarea name="note" rows={3} disabled={!canEdit} className={textareaClass} placeholder="Explain what changed or what happens next."/></label>
+  </EditorFrame>;
+}
+
+export type EditableLog = { id: string; author: string; department: string; sharedWith?: string[]; time: string; message: string; priority: string; pinned: boolean; createdAt?: number };
+export function OperationLogEditor({ log, onClose, onSave, onDelete }: { log: EditableLog | null; onClose: () => void; onSave: (log: EditableLog) => void; onDelete?: (log: EditableLog) => void }) {
+  if (!log) return null;
+  const canEdit = log.author === "Alex Morgan" || log.author === "You";
+  const canDelete = canEdit && Boolean(log.createdAt && Date.now() - log.createdAt <= 10 * 60 * 1000);
+  return <EditorFrame open title="Edit Operations Log entry" description="You can edit entries you authored. Deletion is available for 10 minutes after posting." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(log)} onClose={onClose} onSubmit={(data) => onSave({ ...log, message: String(data.get("message")), sharedWith: String(data.get("sharedWith")) ? [String(data.get("sharedWith"))] : [], priority: String(data.get("priority")), pinned: data.get("pinned") === "on" })}>
+    <label><Label>Update</Label><textarea name="message" required rows={4} defaultValue={log.message} disabled={!canEdit} className={textareaClass}/></label>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label>Share with another department</Label><select name="sharedWith" defaultValue={log.sharedWith?.[0] ?? ""} disabled={!canEdit} className={inputClass}><option value="">Department only</option><option>Front Desk</option><option>Maintenance</option><option>Housekeeping</option><option>Kitchen</option><option>Management</option></select></label><label><Label>Priority</Label><select name="priority" defaultValue={log.priority} disabled={!canEdit} className={inputClass}><option>Standard</option><option>Important</option><option>Urgent</option></select></label></div>
+    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="pinned" type="checkbox" defaultChecked={log.pinned} disabled={!canEdit} className="size-4 rounded border-slate-300 text-indigo-600"/>Pin this entry</label>
+  </EditorFrame>;
+}
+
+export type EditableOperationalRecord = { title: string; detail: string; status: string; tone: "neutral" | "info" | "success" | "warning" | "urgent"; createdAt?: number; createdBy?: string };
+export function IncidentEditor({ record, currentDepartment, onClose, onSave, onDelete }: { record: EditableOperationalRecord | null; currentDepartment: string; onClose: () => void; onSave: (record: EditableOperationalRecord) => void; onDelete?: (record: EditableOperationalRecord) => void }) {
+  if (!record) return null;
+  const assignedDepartment = record.detail.match(/Assigned to ([^·]+)$/)?.[1]?.trim() ?? "Management";
+  const canEdit = assignedDepartment === currentDepartment;
+  const canDelete = (record.createdBy === "Alex Morgan" || record.createdBy === "You") && Boolean(record.createdAt && Date.now() - record.createdAt <= 10 * 60 * 1000);
+  return <EditorFrame open title="Update incident" description="Record the current review status and department responsible for follow-up." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(record)} onClose={onClose} onSubmit={(data) => onSave({ ...record, detail: `${String(data.get("location"))} · Assigned to ${String(data.get("department"))}`, status: String(data.get("status")), tone: String(data.get("status")) === "Resolved" ? "success" : "warning" })}>
+    <div className="rounded-xl bg-slate-50 p-4 font-semibold text-slate-900">{record.title}</div><label><Label>Room or location</Label><input name="location" defaultValue={record.detail.split(" · ")[0]} disabled={!canEdit} className={inputClass}/></label><div className="grid gap-4 sm:grid-cols-2"><label><Label>Status</Label><select name="status" defaultValue={record.status} disabled={!canEdit} className={inputClass}><option>Open</option><option>Awaiting review</option><option>In Progress</option><option>Follow-up required</option><option>Resolved</option><option>Closed</option></select></label><label><Label>Assigned department</Label><select name="department" defaultValue={assignedDepartment} disabled={!canEdit} className={inputClass}><option>Front Desk</option><option>Management</option><option>Security</option><option>Maintenance</option><option>Housekeeping</option></select></label></div><label><Label>Internal update</Label><textarea name="note" rows={3} disabled={!canEdit} className={textareaClass} placeholder="Add the latest action or review note."/></label>
+  </EditorFrame>;
+}
+
+export function LostFoundEditor({ record, onClose, onSave, onDelete }: { record: EditableOperationalRecord | null; onClose: () => void; onSave: (record: EditableOperationalRecord) => void; onDelete?: (record: EditableOperationalRecord) => void }) {
+  if (!record) return null;
+  const stored = record.detail.match(/Stored in (.*)$/)?.[1] ?? "";
+  const canDelete = (record.createdBy === "Alex Morgan" || record.createdBy === "You") && Boolean(record.createdAt && Date.now() - record.createdAt <= 10 * 60 * 1000);
+  return <EditorFrame open title="Update lost and found item" description="Update secure storage and guest pickup or shipping progress." canEdit canDelete={canDelete} onDelete={() => onDelete?.(record)} onClose={onClose} onSubmit={(data) => onSave({ ...record, detail: record.detail.replace(/Stored in .*$/, `Stored in ${String(data.get("storage"))}`), status: String(data.get("status")), tone: String(data.get("status")) === "Returned to guest" ? "success" : "info" })}>
+    <div className="rounded-xl bg-slate-50 p-4 font-semibold text-slate-900">{record.title}</div><label><Label>Storage location</Label><input name="storage" required defaultValue={stored} className={inputClass}/></label><label><Label>Follow-up status</Label><select name="status" defaultValue={record.status} className={inputClass}><option>Not started</option><option>Guest contacted</option><option>Pickup arranged</option><option>Shipping arranged</option><option>Returned to guest</option><option>Disposed per policy</option></select></label><label><Label>Handling note</Label><textarea name="note" rows={3} className={textareaClass} placeholder="Add pickup, shipping, or disposition details."/></label>
+  </EditorFrame>;
+}
