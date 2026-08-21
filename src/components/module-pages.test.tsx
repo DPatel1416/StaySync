@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ModulePage } from "./module-pages";
 import { getDepartmentNotifications } from "@/lib/notification-store";
+import { MaintenanceDashboard } from "./dashboard/workspaces";
 
 describe("Service Request reminders", () => {
   it("lets Front Desk notify the assigned department again", () => {
@@ -19,6 +20,16 @@ describe("Service Request reminders", () => {
     frontDesk.unmount();
     render(<ModulePage role="maintenance" module="service-requests"/>);
     expect(screen.queryByRole("button", { name: /Notify .* again about/ })).not.toBeInTheDocument();
+  });
+
+  it("delivers a Front Desk reminder to the assigned department dashboard", () => {
+    const frontDesk = render(<ModulePage role="front-desk" module="service-requests"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Notify Maintenance again about SR-1047" }));
+    frontDesk.unmount();
+    render(<MaintenanceDashboard/>);
+    expect(screen.getByRole("heading", { name: "Front Desk reminders" })).toBeInTheDocument();
+    expect(screen.getAllByText("Reminder: SR-1047").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Reminder: SR-1047/ }).some((link) => link.getAttribute("href") === "/app/maintenance/service-requests?request=SR-1047")).toBe(true);
   });
 });
 
@@ -77,6 +88,24 @@ describe("Late checkout communication", () => {
 
     render(<ModulePage role="housekeeping" module="room-updates"/>);
     expect(screen.getByText("825")).toBeInTheDocument();
-    expect(screen.getByText("Housekeeping notified")).toBeInTheDocument();
+    expect(screen.getByLabelText("Housekeeping status for room 825")).toHaveValue("Housekeeping notified");
+  });
+
+  it("allows Housekeeping to update the operational status inline", () => {
+    render(<ModulePage role="housekeeping" module="room-updates"/>);
+    const status = screen.getByLabelText("Housekeeping status for room 412");
+    fireEvent.change(status, { target: { value: "In Progress" } });
+    expect(status).toHaveValue("In Progress");
+  });
+});
+
+describe("Housekeeping room assignments", () => {
+  it("allows a supervisor-authorized account to assign rooms and view ownership", () => {
+    render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
+    expect(screen.getByText("Housekeeping Supervisor access")).toBeInTheDocument();
+    const employee = screen.getByLabelText("Assigned employee for room 412");
+    fireEvent.change(employee, { target: { value: "Priya Shah" } });
+    expect(employee).toHaveValue("Priya Shah");
+    expect(screen.getByLabelText("Assigned employee for room 518")).toHaveValue("Elena Ruiz");
   });
 });

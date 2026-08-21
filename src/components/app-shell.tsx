@@ -8,6 +8,7 @@ import { Logo } from "./logo";
 import { cn, initials } from "@/lib/utils";
 import { workspaceNames } from "@/lib/demo-data";
 import type { WorkspaceRole } from "@/lib/permissions";
+import { markDepartmentNotificationsRead, useDepartmentNotifications } from "@/lib/notification-store";
 
 const nav = {
   "front-desk": [
@@ -26,7 +27,7 @@ const nav = {
 
 const users: Record<WorkspaceRole, { name: string; title: string }> = {
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
-  housekeeping: { name: "Priya Shah", title: "Room Attendant" },
+  housekeeping: { name: "Priya Shah", title: "Housekeeping Supervisor" },
   maintenance: { name: "Jordan Lee", title: "Maintenance Technician" },
   manager: { name: "Maya Chen", title: "Operations Manager" },
 };
@@ -34,11 +35,14 @@ const users: Record<WorkspaceRole, { name: string; title: string }> = {
 export function AppShell({ role, children }: { role: WorkspaceRole; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [propertyOpen, setPropertyOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const authorizedProperties = role === "manager" ? ["Ottawa Downtown", "Ottawa Airport"] : ["Ottawa Downtown"];
   const [property, setProperty] = useState(authorizedProperties[0]);
   const pathname = usePathname();
   const user = users[role];
   const base = `/app/${role}`;
+  const departmentNotifications = useDepartmentNotifications(workspaceNames[role]);
+  const unreadNotifications = departmentNotifications.filter((notification) => !notification.readAt);
   const sidebar = <>
     <div className="flex h-[76px] items-center justify-between px-5"><Logo/><button className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="size-5"/></button></div>
     <div className="relative mx-3 mb-4 rounded-xl border border-brand-border bg-brand-soft p-3"><button type="button" onClick={() => setPropertyOpen((current) => !current)} className="flex min-h-11 w-full items-center gap-3 text-left" aria-label={`Current property: ${property}. Open property menu`} aria-expanded={propertyOpen}><span className="grid size-9 place-items-center rounded-lg bg-white text-brand shadow-sm"><Building2 className="size-4"/></span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{property}</span><span className="block text-xs text-slate-500">Northstar Hotels</span></span><ChevronDown className={cn("size-4 text-slate-400 transition-transform", propertyOpen && "rotate-180")}/></button>{propertyOpen && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" role="menu" aria-label="Authorized properties">{authorizedProperties.map((name) => <button key={name} type="button" role="menuitemradio" aria-checked={property === name} onClick={() => { setProperty(name); setPropertyOpen(false); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-50"><span className="min-w-0 flex-1 truncate font-medium">{name}</span>{property === name && <Check className="size-4 text-brand"/>}</button>)}{authorizedProperties.length === 1 && <p className="border-t border-slate-100 px-3 py-2 text-xs leading-5 text-slate-500">This is the only property assigned to your account.</p>}</div>}</div>
@@ -51,7 +55,7 @@ export function AppShell({ role, children }: { role: WorkspaceRole; children: Re
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-width)] flex-col border-r border-t-2 border-r-slate-200 border-t-brand bg-white lg:flex">{sidebar}</aside>
     {open && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm" aria-label="Close navigation overlay" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[290px] flex-col bg-white shadow-2xl">{sidebar}</aside></div>}
     <div className="lg:pl-[var(--sidebar-width)]">
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-t-2 border-b-slate-200/80 border-t-brand bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8"><div className="flex items-center gap-3"><button className="grid size-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu className="size-5"/></button><div className="lg:hidden"><p className="text-sm font-semibold text-slate-900">{workspaceNames[role]}</p><p className="text-xs text-slate-500">{property}</p></div></div><div className="flex items-center gap-2"><span className="hidden rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 sm:block">Demo workspace</span><button className="relative grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Notifications, 3 unread"><Bell className="size-5"/><span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500"><span className="sr-only">3 unread</span></span></button></div></header>
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-t-2 border-b-slate-200/80 border-t-brand bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8"><div className="flex items-center gap-3"><button className="grid size-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu className="size-5"/></button><div className="lg:hidden"><p className="text-sm font-semibold text-slate-900">{workspaceNames[role]}</p><p className="text-xs text-slate-500">{property}</p></div></div><div className="relative flex items-center gap-2"><span className="hidden rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 sm:block">Demo workspace</span><button onClick={() => { const next = !notificationsOpen; setNotificationsOpen(next); if (next) markDepartmentNotificationsRead(workspaceNames[role]); }} className="relative grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Notifications, ${unreadNotifications.length} unread`} aria-expanded={notificationsOpen}><Bell className="size-5"/>{unreadNotifications.length > 0 && <span className="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"><span className="sr-only">Unread notifications: </span>{unreadNotifications.length}</span>}</button>{notificationsOpen && <div className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"><div className="border-b border-slate-100 px-4 py-3"><p className="text-sm font-semibold text-slate-900">Notifications</p><p className="text-xs text-slate-500">Updates sent to {workspaceNames[role]}</p></div>{departmentNotifications.length ? <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto">{departmentNotifications.map((notification) => <Link key={notification.id} href={`${base}/service-requests?request=${notification.serviceRequestId}`} onClick={() => setNotificationsOpen(false)} className="block px-4 py-3 hover:bg-slate-50"><p className="text-sm font-semibold text-slate-800">{notification.title}</p><p className="mt-1 text-sm leading-5 text-slate-500">{notification.message}</p><p className="mt-1.5 text-xs text-slate-400">Sent by {notification.createdBy}</p></Link>)}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No department notifications yet.</p>}</div>}</div></header>
       <main className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-8">{children}</main>
     </div>
   </div>;

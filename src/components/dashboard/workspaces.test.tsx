@@ -19,6 +19,11 @@ describe("dynamic room-change summaries", () => {
     expect(screen.getByLabelText("1 stayover room")).toBeInTheDocument();
   });
 
+  it("shows Housekeeping quality score in the dashboard heading", () => {
+    render(<HousekeepingDashboard/>);
+    expect(screen.getByLabelText("Housekeeping quality score 91 percent")).toBeInTheDocument();
+  });
+
   it("limits the Housekeeping log preview to its own and explicitly shared entries", () => {
     render(<HousekeepingDashboard/>);
     expect(screen.getByText(/VIP group arriving at 3:00 PM/)).toBeInTheDocument();
