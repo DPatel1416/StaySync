@@ -9,13 +9,13 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid username and password." }, { status: 400 });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !serviceKey || !anonKey) return NextResponse.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
+  const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !serviceKey || !publicKey) return NextResponse.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: identity, error: identityError } = await admin.rpc("employee_login_identity", { login_username: parsed.data.username.toLowerCase() });
   if (identityError || !identity) return NextResponse.json({ error: "The username or password is incorrect." }, { status: 401 });
-  const auth = createClient(url, anonKey, { auth: { persistSession: false } });
+  const auth = createClient(url, publicKey, { auth: { persistSession: false } });
   const { data, error } = await auth.auth.signInWithPassword({ email: String(identity), password: parsed.data.password });
   if (error || !data.session) return NextResponse.json({ error: "The username or password is incorrect." }, { status: 401 });
   const { data: profile } = await admin.from("users").select("department_id, account_kind").eq("id", data.user.id).single();
