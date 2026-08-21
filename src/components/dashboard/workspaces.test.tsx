@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { FrontDeskDashboard, HousekeepingDashboard } from "./workspaces";
+import { FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
 import { updateServiceRequest } from "@/lib/service-request-store";
 
 describe("dynamic room-change summaries", () => {
@@ -17,6 +17,20 @@ describe("dynamic room-change summaries", () => {
     render(<HousekeepingDashboard/>);
     expect(screen.getByLabelText("1 late checkout")).toBeInTheDocument();
     expect(screen.getByLabelText("1 stayover room")).toBeInTheDocument();
+  });
+
+  it("limits the Housekeeping log preview to its own and explicitly shared entries", () => {
+    render(<HousekeepingDashboard/>);
+    expect(screen.getByText(/VIP group arriving at 3:00 PM/)).toBeInTheDocument();
+    expect(screen.queryByText(/Room 604 remains out of service/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/East elevator returned to service/)).not.toBeInTheDocument();
+  });
+
+  it("limits the Maintenance log preview to its own and explicitly shared entries", () => {
+    render(<MaintenanceDashboard/>);
+    expect(screen.getByText(/Room 604 remains out of service/)).toBeInTheDocument();
+    expect(screen.getByText(/East elevator returned to service/)).toBeInTheDocument();
+    expect(screen.queryByText(/VIP group arriving at 3:00 PM/)).not.toBeInTheDocument();
   });
 
   it("limits Front Desk attention items to work assigned to Front Desk", () => {

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ArrowRight, ChevronRight, Pin, TrendingUp } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader } from "../ui/card";
-import { latestLogs } from "@/lib/demo-data";
+import { latestLogs, workspaceNames } from "@/lib/demo-data";
+import type { WorkspaceRole } from "@/lib/permissions";
 
 export function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string; title: string; description: string; actions?: React.ReactNode }) {
   return <div className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold text-brand">{eyebrow}</p><h1 className="mt-1 text-3xl font-bold tracking-[-.035em] text-slate-950 sm:text-[34px]">{title}</h1><p className="mt-2 max-w-2xl text-[15px] text-slate-500">{description}</p></div>{actions}</div>;
@@ -16,8 +17,14 @@ export function QuickActions({ items }: { items: Array<{ label: string; icon: Re
   })}</div></section>;
 }
 
-export function OperationsPreview({ base }: { base: string }) {
-  return <Card><CardHeader title="Operations Log" description="Important updates across the hotel" action={<Link href={`${base}/operations-log`} className="text-sm font-semibold text-brand hover:text-brand-strong">View all</Link>}/><div className="divide-y divide-slate-100">{latestLogs.slice(0, 3).map((log) => <article key={log.id} className="group flex gap-3 px-5 py-4 hover:bg-slate-50/60 sm:px-6"><span className={`mt-1 size-2 shrink-0 rounded-full ${log.priority === "Urgent" ? "bg-rose-500" : log.priority === "Important" ? "bg-amber-500" : "bg-sky-500"}`} aria-hidden="true"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="text-sm font-semibold text-slate-800">{log.author}</p><span className="text-xs text-slate-400">{log.department} · {log.time}</span>{log.pinned && <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500"><Pin className="size-3"/>Pinned</span>}</div><p className="mt-1.5 text-sm leading-6 text-slate-600">{log.message}</p></div></article>)}</div></Card>;
+export function OperationsPreview({ base, role }: { base: string; role: WorkspaceRole }) {
+  const department = workspaceNames[role];
+  const visibleLogs = role === "manager"
+    ? latestLogs
+    : latestLogs.filter((log) => log.department === department || log.sharedWith.includes(department));
+  const description = role === "manager" ? "Latest updates across hotel departments" : `${department} updates and entries shared with your team`;
+
+  return <Card><CardHeader title="Operations Log" description={description} action={<Link href={`${base}/operations-log`} className="text-sm font-semibold text-brand hover:text-brand-strong">View all</Link>}/><div className="divide-y divide-slate-100">{visibleLogs.slice(0, 3).map((log) => <article key={log.id} className="group flex gap-3 px-5 py-4 hover:bg-slate-50/60 sm:px-6"><span className={`mt-1 size-2 shrink-0 rounded-full ${log.priority === "Urgent" ? "bg-rose-500" : log.priority === "Important" ? "bg-amber-500" : "bg-sky-500"}`} aria-hidden="true"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="text-sm font-semibold text-slate-800">{log.author}</p><span className="text-xs text-slate-400">{log.department} · {log.time}</span>{log.pinned && <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500"><Pin className="size-3"/>Pinned</span>}</div><p className="mt-1.5 text-sm leading-6 text-slate-600">{log.message}</p></div></article>)}{visibleLogs.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500 sm:px-6">No Operations Log entries are available for {department}.</p>}</div></Card>;
 }
 
 export function QualityScore({ department, score, change = "+2%" }: { department: string; score: number; change?: string }) {
