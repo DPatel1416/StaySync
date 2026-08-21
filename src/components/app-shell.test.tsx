@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
+import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/app/front-desk" }));
 
@@ -20,5 +21,13 @@ describe("property selector", () => {
     render(<AppShell role="housekeeping"><div>Housekeeping dashboard content</div></AppShell>);
     expect(screen.getByText("Housekeeping dashboard content").closest("[data-department-theme]")).toHaveAttribute("data-department-theme", "housekeeping");
     expect(screen.getByRole("button", { name: /Current property: Ottawa Downtown/ }).parentElement).toHaveClass("border-brand-border", "bg-brand-soft");
+  });
+
+  it("hides Room Updates from Housekeeping attendants", () => {
+    saveDemoEmployeeSession("priya.shah");
+    render(<AppShell role="housekeeping"><div>Attendant dashboard</div></AppShell>);
+    expect(screen.queryByRole("link", { name: "Room Updates" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Assigned Rooms" }).length).toBeGreaterThan(0);
+    clearDemoEmployeeSession();
   });
 });

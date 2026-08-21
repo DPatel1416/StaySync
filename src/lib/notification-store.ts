@@ -8,6 +8,7 @@ export type DepartmentNotification = {
   title: string;
   message: string;
   serviceRequestId: string;
+  href?: string;
   createdAt: number;
   createdBy: string;
   readAt?: number;

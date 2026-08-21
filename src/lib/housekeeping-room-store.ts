@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { sendDepartmentReminder } from "./notification-store";
 
 export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready to inspect" | "Inspected" | "Waiting";
 
@@ -24,6 +25,7 @@ let assignments = [...seedAssignments];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-housekeeping-room-board";
 let hydrated = false;
+let listeningForStorage = false;
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
@@ -33,6 +35,14 @@ function hydrate() {
     if (stored) assignments = (JSON.parse(stored) as Array<Omit<HousekeepingRoomAssignment, "status"> & { status: HousekeepingRoomStatus | "Ready" }>).map((assignment) => ({ ...assignment, status: assignment.status === "Ready" ? "Ready to inspect" : assignment.status }));
   } catch {
     assignments = [...seedAssignments];
+  }
+  if (!listeningForStorage) {
+    listeningForStorage = true;
+    window.addEventListener("storage", (event) => {
+      if (event.key !== storageKey) return;
+      try { assignments = event.newValue ? JSON.parse(event.newValue) as HousekeepingRoomAssignment[] : [...seedAssignments]; } catch { assignments = [...seedAssignments]; }
+      notify();
+    });
   }
 }
 
@@ -44,9 +54,13 @@ function notify() { listeners.forEach((listener) => listener()); }
 
 export function updateHousekeepingRoom(room: string, changes: Partial<Pick<HousekeepingRoomAssignment, "assignedTo" | "status">>) {
   hydrate();
+  const previous = assignments.find((assignment) => assignment.room === room);
   assignments = assignments.map((assignment) => assignment.room === room ? { ...assignment, ...changes } : assignment);
   persist();
   notify();
+  if (changes.status === "Ready to inspect" && previous?.status !== "Ready to inspect") {
+    sendDepartmentReminder({ department: "Housekeeping", title: `Room ${room} ready for inspection`, message: `${previous?.assignedTo ?? "The assigned attendant"} marked room ${room} ready for supervisor inspection.`, serviceRequestId: `room-${room}`, href: "/app/housekeeping/assigned-rooms", createdBy: previous?.assignedTo ?? "Housekeeping attendant", audience: "SUPERVISORS", tone: "warning" });
+  }
 }
 
 export function parseRoomNumbers(value: string) {

@@ -4,11 +4,26 @@ import { ModulePage } from "./module-pages";
 import { getDepartmentNotifications } from "@/lib/notification-store";
 import { MaintenanceDashboard } from "./dashboard/workspaces";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
-import { updateServiceRequest } from "@/lib/service-request-store";
+import { addServiceRequest, deleteServiceRequest, updateServiceRequest } from "@/lib/service-request-store";
 import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
 import { isRoomUpdateVisible } from "@/lib/room-update-store";
+import { serviceRequests as demoServiceRequests } from "@/lib/demo-data";
 
 describe("Service Request reminders", () => {
+  it("notifies the Housekeeping supervisor when a new request is created", () => {
+    const before = getDepartmentNotifications().filter((notification) => notification.department === "Housekeeping").length;
+    render(<ModulePage role="front-desk" module="service-requests" create/>);
+    fireEvent.change(screen.getByLabelText(/^Request title/), { target: { value: "Refresh room before arrival" } });
+    fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: "Please refresh towels and amenities." } });
+    fireEvent.change(screen.getByLabelText(/^Room or location/), { target: { value: "Room 722" } });
+    fireEvent.change(screen.getByLabelText(/^Assign to department/), { target: { value: "Housekeeping" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create request" }));
+    const housekeepingNotifications = getDepartmentNotifications().filter((notification) => notification.department === "Housekeeping");
+    expect(housekeepingNotifications).toHaveLength(before + 1);
+    expect(housekeepingNotifications[0]).toEqual(expect.objectContaining({ audience: "SUPERVISORS", title: expect.stringMatching(/^New service request:/) }));
+    act(() => deleteServiceRequest(housekeepingNotifications[0].serviceRequestId));
+  });
+
   it("lets Front Desk notify the assigned department again", () => {
     const before = getDepartmentNotifications().length;
     render(<ModulePage role="front-desk" module="service-requests"/>);
@@ -172,8 +187,10 @@ describe("Housekeeping room assignments", () => {
     const startCleaning = within(room307!).getByRole("button", { name: "Start cleaning" });
     expect(startCleaning).toHaveClass("bg-amber-50", "text-amber-900");
     fireEvent.click(startCleaning);
+    const notificationCount = getDepartmentNotifications().filter((notification) => notification.title === "Room 307 ready for inspection").length;
     fireEvent.click(within(room307!).getByRole("button", { name: "Ready for inspection" }));
     expect(within(room307!).getByText("Ready to inspect")).toBeInTheDocument();
+    expect(getDepartmentNotifications().filter((notification) => notification.title === "Room 307 ready for inspection")).toHaveLength(notificationCount + 1);
     attendant.unmount();
 
     saveDemoEmployeeSession("sofia.martin");
@@ -194,6 +211,9 @@ describe("Housekeeping service request routing", () => {
     expect(screen.getByText("SR-1048")).toBeInTheDocument();
     expect(screen.getByText("SR-1044")).toBeInTheDocument();
     expect(screen.queryByText("SR-1047")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Employee-reported room issues" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Department service requests" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Completed" })).toBeInTheDocument();
     clearDemoEmployeeSession();
   });
 
@@ -229,6 +249,39 @@ describe("Housekeeping service request routing", () => {
     expect(screen.getByText("In Progress")).toBeInTheDocument();
 
     act(() => updateServiceRequest({ id: "SR-1048", title: "Extra towels requested", location: "Room 718", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Standard", status: "Open", due: "10:30 AM" }));
+    clearDemoEmployeeSession();
+  });
+
+  it("moves finished requests into the completed section", () => {
+    saveDemoEmployeeSession("elena.ruiz");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    fireEvent.click(screen.getByRole("button", { name: /Open SR-1044/ }));
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "Completed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("link", { name: /SR-1044 · Remove used room-service tray/ })).toBeInTheDocument();
+    act(() => updateServiceRequest({ id: "SR-1044", title: "Remove used room-service tray", location: "Room 526", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Elena Ruiz", priority: "Standard", status: "Assigned", due: "12:00 PM" }));
+    clearDemoEmployeeSession();
+  });
+
+  it("shows historical requests when the date changes", () => {
+    const createdAt = new Date("2026-08-20T10:00:00").getTime();
+    addServiceRequest({ id: "SR-HISTORY", title: "Historical linen request", location: "Room 225", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Standard", status: "Open", due: "11:00 AM", createdAt });
+    saveDemoEmployeeSession("sofia.martin");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    expect(screen.queryByText("SR-HISTORY")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Request date"), { target: { value: "2026-08-20" } });
+    expect(screen.getByText("SR-HISTORY")).toBeInTheDocument();
+    act(() => deleteServiceRequest("SR-HISTORY"));
+    clearDemoEmployeeSession();
+  });
+
+  it("receives service request changes from another tab without refreshing", () => {
+    saveDemoEmployeeSession("sofia.martin");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    const liveRequest = { id: "SR-LIVE", title: "Live towel delivery", location: "Room 410", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Important", status: "Open", due: "Now", createdAt: Date.now() };
+    act(() => window.dispatchEvent(new StorageEvent("storage", { key: "staysync-service-requests", newValue: JSON.stringify([liveRequest, ...demoServiceRequests]) })));
+    expect(screen.getByText("SR-LIVE")).toBeInTheDocument();
+    act(() => deleteServiceRequest("SR-LIVE"));
     clearDemoEmployeeSession();
   });
 });

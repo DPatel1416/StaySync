@@ -63,6 +63,8 @@ describe("dynamic room-change summaries", () => {
   it("shows Housekeeping quality score in the dashboard heading", () => {
     render(<HousekeepingDashboard/>);
     expect(screen.getByLabelText("Housekeeping quality score 91 percent")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Service Requests" })).toHaveAttribute("href", "/app/housekeeping/service-requests");
+    expect(screen.getByRole("link", { name: "Reported Room Issues" })).toHaveAttribute("href", "/app/housekeeping/service-requests#reported-room-issues");
   });
 
   it("limits the Housekeeping log preview to its own and explicitly shared entries", () => {

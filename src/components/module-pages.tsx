@@ -9,7 +9,7 @@ import type { WorkspaceRole } from "@/lib/permissions";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
-import { PageHeading } from "./dashboard/shared";
+import { ListRows, PageHeading } from "./dashboard/shared";
 import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, OperationLogDialog, ServiceRequestDialog } from "./record-dialogs";
 import { IncidentEditor, LostFoundEditor, OperationLogEditor, ServiceRequestEditor, type EditableLog, type EditableOperationalRecord, type EditableRequest } from "./record-update-dialogs";
 import { addRoomUpdate, isInformationalRoomChange, updateRoomUpdateState, useRoomUpdates } from "@/lib/room-update-store";
@@ -80,7 +80,19 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
   const [selectedRequest, setSelectedRequest] = useState<EditableRequest | null>(() => visibleRequests.find((request) => request.id === initialRequestId) ?? null);
   const [lastReminder, setLastReminder] = useState<{ requestId: string; department: string } | null>(null);
   const [lastSavedRequest, setLastSavedRequest] = useState<EditableRequest | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState(today);
   const canCreate = role !== "maintenance" || true;
+  const datedRequests = visibleRequests.filter((request) => request.createdAt ? new Date(request.createdAt).toISOString().slice(0, 10) === selectedDate : selectedDate === today);
+  const completedRequests = datedRequests.filter((request) => request.status === "Completed" || request.status === "Cancelled");
+  const activeRequests = datedRequests.filter((request) => request.status !== "Completed" && request.status !== "Cancelled");
+  const reportedIssues = isHousekeepingSupervisor ? activeRequests.filter((request) => request.from === "Housekeeping") : [];
+  const primaryRequests = isHousekeepingSupervisor ? activeRequests.filter((request) => request.from !== "Housekeeping") : activeRequests;
+  function createRequest(draft: { title: string; location: string; department: string; priority: string; due: string }) {
+    const request = { id: `SR-${1050 + requests.length}`, title: draft.title, location: draft.location, from: workspaceNames[role], assigned: draft.department, assignedUser: draft.department === "Housekeeping" ? "Unassigned" : undefined, priority: draft.priority, status: "Open", due: draft.due ? "Scheduled" : "Today", createdAt: Date.now(), createdBy: role === "front-desk" ? "Alex Morgan" : currentEmployee?.name ?? "You" };
+    addServiceRequest(request);
+    if (draft.department === "Housekeeping") sendDepartmentReminder({ department: "Housekeeping", title: `New service request: ${request.id}`, message: `${request.title} at ${request.location} is waiting for supervisor assignment.`, serviceRequestId: request.id, createdBy: request.createdBy, audience: "SUPERVISORS", tone: request.priority === "Urgent" ? "urgent" : "info" });
+  }
   function remind(request: EditableRequest) {
     sendDepartmentReminder({
       department: request.assigned,
@@ -93,13 +105,14 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
     setLastReminder({ requestId: request.id, department: request.assigned });
   }
   return <div className="space-y-6">
-    <PageHeading eyebrow={workspaceNames[role]} title="Service Requests" description={role === "housekeeping" ? isHousekeepingSupervisor ? "Review the Housekeeping queue and assign requests to the employee responsible." : "Requests assigned specifically to you." : "Coordinate operational requests from creation through completion."} actions={canCreate ? <ServiceRequestDialog defaultOpen={autoOpen} onCreate={(draft) => addServiceRequest({ id: `SR-${1050 + requests.length}`, title: draft.title, location: draft.location, from: workspaceNames[role], assigned: draft.department, assignedUser: draft.department === "Housekeeping" ? "Unassigned" : undefined, priority: draft.priority, status: "Open", due: draft.due ? "Scheduled" : "Today", createdAt: Date.now(), createdBy: role === "front-desk" ? "Alex Morgan" : "You" })}/> : undefined}/>
-    <Toolbar placeholder="Search requests, rooms, or locations…"/>
+    <PageHeading eyebrow={workspaceNames[role]} title="Service Requests" description={role === "housekeeping" ? isHousekeepingSupervisor ? "Review incoming department requests separately from issues reported by your team." : "Requests assigned specifically to you." : "Coordinate operational requests from creation through completion."} actions={canCreate ? <ServiceRequestDialog defaultOpen={autoOpen} onCreate={createRequest}/> : undefined}/>
+    <Toolbar placeholder="Search requests, rooms, or locations…" action={<label className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600"><CalendarDays className="size-4"/><span className="sr-only">Request date</span><input aria-label="Request date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="bg-transparent text-sm outline-none"/></label>}/>
     <p className="sr-only" role="status" aria-live="polite">{lastReminder ? `Reminder sent to ${lastReminder.department} for ${lastReminder.requestId}.` : ""}</p>
     {lastSavedRequest && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><Check className="size-4"/>{isHousekeepingSupervisor ? `${lastSavedRequest.id} assigned to ${lastSavedRequest.assignedUser ?? lastSavedRequest.assigned}. The request is now visible in their queue.` : `${lastSavedRequest.id} updated to ${lastSavedRequest.status}.`}</div>}
-    <Card className="overflow-hidden">
+    {isHousekeepingSupervisor && <Card id="reported-room-issues" className="overflow-hidden"><CardHeader title="Employee-reported room issues" description="Room issues and SOS requests submitted by Housekeeping attendants"/><div className="divide-y divide-slate-100">{reportedIssues.map((request) => <button key={request.id} onClick={() => setSelectedRequest(request)} className="flex min-h-[72px] w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 sm:px-6"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-sm font-bold text-amber-800">{request.location.replace("Room ", "")}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{request.title}</span><span className="mt-1 block text-xs text-slate-500">Reported by {request.createdBy ?? "Housekeeping employee"}</span></span><Badge tone={request.priority === "Urgent" ? "urgent" : "warning"}>{request.assignedUser === "Unassigned" ? "Needs assignment" : request.status}</Badge></button>)}{reportedIssues.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No employee-reported issues for this date.</p>}</div></Card>}
+    <Card className="overflow-hidden"><CardHeader title={isHousekeepingSupervisor ? "Department service requests" : "Active service requests"} description={isHousekeepingSupervisor ? "Requests sent to Housekeeping by Front Desk and other departments" : `Open work for ${selectedDate}`}/>
       <div className="hidden grid-cols-[120px_1fr_150px_140px_130px_110px_48px] gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid"><span>Request</span><span>Details</span><span>Assigned to</span><span>Priority</span><span>Status</span><span>Due</span>{role === "front-desk" && <span className="text-center">Notify</span>}</div>
-      <div className="divide-y divide-slate-100">{visibleRequests.map((request) => {
+      <div className="divide-y divide-slate-100">{primaryRequests.map((request) => {
         const canRemind = role === "front-desk" && request.status !== "Completed" && request.status !== "Cancelled";
         const sent = lastReminder?.requestId === request.id;
         return <article key={request.id} className="relative pr-16 lg:grid lg:grid-cols-[1fr_48px] lg:items-center lg:pr-0">
@@ -108,8 +121,9 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
           </button>
           {canRemind && <button type="button" onClick={() => remind(request)} aria-label={`Notify ${request.assigned} again about ${request.id}`} title={`Notify ${request.assigned} again`} className={`absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-xl border transition lg:static lg:translate-y-0 ${sent ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500 hover:border-brand-border hover:bg-brand-soft hover:text-brand-strong"}`}>{sent ? <Check className="size-4"/> : <BellRing className="size-4"/>}</button>}
         </article>;
-      })}{visibleRequests.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No service requests are currently assigned to you.</p>}</div>
+      })}{primaryRequests.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No active service requests for this date.</p>}</div>
     </Card>
+    <Card className="overflow-hidden"><CardHeader title="Completed" description={`Completed and cancelled requests for ${selectedDate}`}/>{completedRequests.length ? <ListRows rows={completedRequests.map((request) => ({ title: `${request.id} · ${request.title}`, detail: `${request.location} · ${request.assignedUser ?? request.assigned}`, badge: request.status, tone: request.status === "Completed" ? "success" : "neutral", href: `/app/${role}/service-requests?request=${request.id}` }))}/> : <p className="px-5 py-8 text-center text-sm text-slate-500">No completed requests for this date.</p>}</Card>
     {lastReminder && <div role="alert" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><Check className="size-4"/>Reminder sent to {lastReminder.department} for {lastReminder.requestId}.</div>}
     <ServiceRequestEditor request={selectedRequest} currentDepartment={workspaceNames[role]} currentUserName={currentEmployee?.name} isDepartmentSupervisor={isHousekeepingSupervisor} assigneeOptions={housekeepingEmployees} onClose={() => setSelectedRequest(null)} onSave={(updated) => { updateServiceRequest(updated); setLastSavedRequest(updated); }} onDelete={(deleted) => deleteServiceRequest(deleted.id)}/>
   </div>;

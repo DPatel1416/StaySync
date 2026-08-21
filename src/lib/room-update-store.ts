@@ -7,14 +7,44 @@ export type RoomUpdate = { id?: string; room: string; type: string; detail: stri
 
 let updates: RoomUpdate[] = [...seedRoomUpdates];
 const listeners = new Set<() => void>();
+const storageKey = "staysync-room-updates";
+let hydrated = false;
+let listeningForStorage = false;
+
+function hydrate() {
+  if (hydrated || typeof window === "undefined") return;
+  hydrated = true;
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) updates = JSON.parse(stored) as RoomUpdate[];
+  } catch {
+    updates = [...seedRoomUpdates];
+  }
+  if (!listeningForStorage) {
+    listeningForStorage = true;
+    window.addEventListener("storage", (event) => {
+      if (event.key !== storageKey) return;
+      try { updates = event.newValue ? JSON.parse(event.newValue) as RoomUpdate[] : [...seedRoomUpdates]; } catch { updates = [...seedRoomUpdates]; }
+      listeners.forEach((listener) => listener());
+    });
+  }
+}
+
+function persist() {
+  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(updates));
+}
 
 export function addRoomUpdate(update: RoomUpdate) {
+  hydrate();
   updates = [update, ...updates];
+  persist();
   listeners.forEach((listener) => listener());
 }
 
 export function updateRoomUpdateState(id: string | undefined, fallbackKey: string, state: string) {
+  hydrate();
   updates = updates.map((update) => (id ? update.id === id : `${update.room}-${update.type}` === fallbackKey) ? { ...update, state } : update);
+  persist();
   listeners.forEach((listener) => listener());
 }
 
@@ -29,8 +59,8 @@ export function isRoomUpdateVisible(update: RoomUpdate, now = Date.now()) {
 
 export function useRoomUpdates() {
   const allUpdates = useSyncExternalStore<RoomUpdate[]>(
-    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
-    () => updates,
+    (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
+    () => { hydrate(); return updates; },
     () => seedRoomUpdates as RoomUpdate[],
   );
   const [now, setNow] = useState(() => Date.now());
