@@ -10,7 +10,9 @@ StaySync is a hotel communication and operations platform for service requests, 
 4. Open `http://localhost:3000` and use a demo login:
 
    - Front Desk: `alex.morgan` / `staysync-demo`
-   - Housekeeping: `priya.shah` / `staysync-demo`
+   - Housekeeping Supervisor: `sofia.martin` / `staysync-demo`
+   - Housekeeping Attendant: `priya.shah` / `staysync-demo`
+   - Housekeeping Attendant: `elena.ruiz` / `staysync-demo`
    - Maintenance: `jordan.lee` / `staysync-demo`
    - Manager: `maya.chen` / `staysync-demo`
    - Account Holder: `owner@northstar.demo` / `staysync-demo`

@@ -4,7 +4,8 @@ export type DemoEmployee = { password: string; workspace: WorkspaceRole; name: s
 
 export const demoEmployees: Record<string, DemoEmployee> = {
   "alex.morgan": { password: "staysync-demo", workspace: "front-desk", name: "Alex Morgan", title: "Guest Services Agent" },
-  "priya.shah": { password: "staysync-demo", workspace: "housekeeping", name: "Priya Shah", title: "Housekeeping Supervisor", isSupervisor: true },
+  "sofia.martin": { password: "staysync-demo", workspace: "housekeeping", name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
+  "priya.shah": { password: "staysync-demo", workspace: "housekeeping", name: "Priya Shah", title: "Room Attendant" },
   "elena.ruiz": { password: "staysync-demo", workspace: "housekeeping", name: "Elena Ruiz", title: "Room Attendant" },
   "jordan.lee": { password: "staysync-demo", workspace: "maintenance", name: "Jordan Lee", title: "Maintenance Technician" },
   "maya.chen": { password: "staysync-demo", workspace: "manager", name: "Maya Chen", title: "Operations Manager", isSupervisor: true },

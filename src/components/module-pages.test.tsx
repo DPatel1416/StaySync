@@ -1,10 +1,11 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ModulePage } from "./module-pages";
 import { getDepartmentNotifications } from "@/lib/notification-store";
 import { MaintenanceDashboard } from "./dashboard/workspaces";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { updateServiceRequest } from "@/lib/service-request-store";
+import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
 
 describe("Service Request reminders", () => {
   it("lets Front Desk notify the assigned department again", () => {
@@ -103,7 +104,7 @@ describe("Late checkout communication", () => {
 
 describe("Housekeeping room assignments", () => {
   it("allows a supervisor to assign several rooms in one action and view employee workloads", () => {
-    saveDemoEmployeeSession("priya.shah");
+    saveDemoEmployeeSession("sofia.martin");
     render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
     expect(screen.getByText("Supervisor assignment access")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Rooms"), { target: { value: "701-703, 710" } });
@@ -124,11 +125,38 @@ describe("Housekeeping room assignments", () => {
     expect(screen.queryByRole("button", { name: "Assign rooms" })).not.toBeInTheDocument();
     clearDemoEmployeeSession();
   });
+
+  it("lets Priya progress only her rooms and lets the supervisor perform inspection", () => {
+    saveDemoEmployeeSession("priya.shah");
+    const attendant = render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
+    expect(screen.getByText("307")).toBeInTheDocument();
+    expect(screen.getByText("308")).toBeInTheDocument();
+    expect(screen.queryByText("518")).not.toBeInTheDocument();
+    expect(screen.getByText("2 rooms assigned to you today")).toBeInTheDocument();
+    expect(screen.queryByText(/142 guest rooms/)).not.toBeInTheDocument();
+    const room307 = screen.getByText("307").closest("article");
+    expect(room307).not.toBeNull();
+    const startCleaning = within(room307!).getByRole("button", { name: "Start cleaning" });
+    expect(startCleaning).toHaveClass("bg-amber-50", "text-amber-900");
+    fireEvent.click(startCleaning);
+    fireEvent.click(within(room307!).getByRole("button", { name: "Ready for inspection" }));
+    expect(within(room307!).getByText("Ready to inspect")).toBeInTheDocument();
+    attendant.unmount();
+
+    saveDemoEmployeeSession("sofia.martin");
+    render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
+    const supervisorRoom307 = screen.getByText("307").closest("article");
+    expect(supervisorRoom307).not.toBeNull();
+    fireEvent.click(within(supervisorRoom307!).getByRole("button", { name: "Mark inspected" }));
+    expect(within(supervisorRoom307!).getByText("Inspected")).toBeInTheDocument();
+    act(() => updateHousekeepingRoom("307", { status: "Assigned" }));
+    clearDemoEmployeeSession();
+  });
 });
 
 describe("Housekeeping service request routing", () => {
   it("shows the complete Housekeeping queue to the supervisor", () => {
-    saveDemoEmployeeSession("priya.shah");
+    saveDemoEmployeeSession("sofia.martin");
     render(<ModulePage role="housekeeping" module="service-requests"/>);
     expect(screen.getByText("SR-1048")).toBeInTheDocument();
     expect(screen.getByText("SR-1044")).toBeInTheDocument();
@@ -146,7 +174,7 @@ describe("Housekeeping service request routing", () => {
   });
 
   it("moves a queued request to the selected employee", () => {
-    saveDemoEmployeeSession("priya.shah");
+    saveDemoEmployeeSession("sofia.martin");
     const supervisor = render(<ModulePage role="housekeeping" module="service-requests"/>);
     fireEvent.click(screen.getByRole("button", { name: /Open SR-1048/ }));
     fireEvent.change(screen.getByLabelText("Assigned Housekeeping employee"), { target: { value: "Elena Ruiz" } });

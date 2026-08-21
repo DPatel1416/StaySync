@@ -28,7 +28,7 @@ const nav = {
 
 const users: Record<WorkspaceRole, { name: string; title: string; isSupervisor?: boolean }> = {
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
-  housekeeping: { name: "Priya Shah", title: "Housekeeping Supervisor", isSupervisor: true },
+  housekeeping: { name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
   maintenance: { name: "Jordan Lee", title: "Maintenance Technician" },
   manager: { name: "Maya Chen", title: "Operations Manager", isSupervisor: true },
 };

@@ -26,7 +26,7 @@ export function FrontDeskDashboard() {
 export function HousekeepingDashboard() {
   const updates = useRoomUpdates();
   const [employee, setEmployee] = useState<DemoEmployee | null>(null);
-  useEffect(() => setEmployee(getDemoEmployeeSession("housekeeping") ?? demoEmployees["priya.shah"]), []);
+  useEffect(() => setEmployee(getDemoEmployeeSession("housekeeping") ?? demoEmployees["sofia.martin"]), []);
   return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Housekeeping" description={`Good morning, ${employee?.name ?? "Housekeeping team"}. Room changes and assignments for Ottawa Downtown.`} actions={<CompactQualityScore department="Housekeeping" score={91}/>}/><QuickActions items={[{ label: "Update Room Status", icon: RefreshCw, primary: true, href: "/app/housekeeping/room-updates" }, { label: "Report Room Issue", icon: AlertTriangle, href: "/app/housekeeping/service-requests?create=1" }, { label: "Request Support", icon: ClipboardPlus, href: "/app/housekeeping/service-requests?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/housekeeping/operations-log?create=1" }]}/>
     {employee?.isSupervisor && <DepartmentReminders department="Housekeeping" base="/app/housekeeping"/>}
     <RoomChangeSummary workspace="housekeeping"/>

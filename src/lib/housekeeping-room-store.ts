@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready" | "Waiting";
+export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready to inspect" | "Inspected" | "Waiting";
 
 export type HousekeepingRoomAssignment = {
   room: string;
@@ -14,9 +14,10 @@ export type HousekeepingRoomAssignment = {
 
 const seedAssignments: HousekeepingRoomAssignment[] = [
   { room: "307", service: "Stayover service", priority: "Priority", assignedTo: "Priya Shah", status: "Assigned" },
+  { room: "308", service: "Departure clean", priority: "Standard", assignedTo: "Priya Shah", status: "In Progress" },
   { room: "412", service: "Departure clean", priority: "Standard", assignedTo: "Unassigned", status: "Waiting" },
   { room: "518", service: "Departure clean", priority: "Priority", assignedTo: "Elena Ruiz", status: "In Progress" },
-  { room: "621", service: "Refresh service", priority: "Standard", assignedTo: "Marcus Green", status: "Ready" },
+  { room: "621", service: "Refresh service", priority: "Standard", assignedTo: "Marcus Green", status: "Ready to inspect" },
 ];
 
 let assignments = [...seedAssignments];
@@ -29,7 +30,7 @@ function hydrate() {
   hydrated = true;
   try {
     const stored = window.localStorage.getItem(storageKey);
-    if (stored) assignments = JSON.parse(stored) as HousekeepingRoomAssignment[];
+    if (stored) assignments = (JSON.parse(stored) as Array<Omit<HousekeepingRoomAssignment, "status"> & { status: HousekeepingRoomStatus | "Ready" }>).map((assignment) => ({ ...assignment, status: assignment.status === "Ready" ? "Ready to inspect" : assignment.status }));
   } catch {
     assignments = [...seedAssignments];
   }
