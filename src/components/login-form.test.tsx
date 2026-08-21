@@ -26,6 +26,7 @@ describe("LoginForm", () => {
     expect(screen.getByLabelText("Your full name")).toBeInTheDocument();
     expect(screen.getByLabelText("Organization name")).toBeInTheDocument();
     expect(screen.getByLabelText("First property")).toBeInTheDocument();
+    expect(screen.getByLabelText("Number of guest rooms")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm password")).toBeInTheDocument();
   });
 

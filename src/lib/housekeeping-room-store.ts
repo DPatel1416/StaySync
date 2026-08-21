@@ -21,18 +21,62 @@ const seedAssignments: HousekeepingRoomAssignment[] = [
 
 let assignments = [...seedAssignments];
 const listeners = new Set<() => void>();
+const storageKey = "staysync-housekeeping-room-board";
+let hydrated = false;
+
+function hydrate() {
+  if (hydrated || typeof window === "undefined") return;
+  hydrated = true;
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) assignments = JSON.parse(stored) as HousekeepingRoomAssignment[];
+  } catch {
+    assignments = [...seedAssignments];
+  }
+}
+
+function persist() {
+  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(assignments));
+}
 
 function notify() { listeners.forEach((listener) => listener()); }
 
 export function updateHousekeepingRoom(room: string, changes: Partial<Pick<HousekeepingRoomAssignment, "assignedTo" | "status">>) {
+  hydrate();
   assignments = assignments.map((assignment) => assignment.room === room ? { ...assignment, ...changes } : assignment);
+  persist();
+  notify();
+}
+
+export function parseRoomNumbers(value: string) {
+  const rooms = new Set<string>();
+  for (const token of value.split(/[\s,]+/).map((item) => item.trim()).filter(Boolean)) {
+    const range = token.match(/^(\d+)-(\d+)$/);
+    if (!range) { rooms.add(token); continue; }
+    const start = Number(range[1]);
+    const end = Number(range[2]);
+    if (end < start || end - start > 500) continue;
+    for (let room = start; room <= end; room += 1) rooms.add(String(room));
+  }
+  return [...rooms];
+}
+
+export function assignHousekeepingRooms(roomNumbers: string[], assignedTo: string, service: HousekeepingRoomAssignment["service"], priority: HousekeepingRoomAssignment["priority"]) {
+  hydrate();
+  for (const room of roomNumbers) {
+    const existing = assignments.find((assignment) => assignment.room === room);
+    const next: HousekeepingRoomAssignment = { room, service, priority, assignedTo, status: "Assigned" };
+    assignments = existing ? assignments.map((assignment) => assignment.room === room ? next : assignment) : [...assignments, next];
+  }
+  assignments.sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true }));
+  persist();
   notify();
 }
 
 export function useHousekeepingRooms() {
   return useSyncExternalStore(
-    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
-    () => assignments,
+    (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
+    () => { hydrate(); return assignments; },
     () => seedAssignments,
   );
 }

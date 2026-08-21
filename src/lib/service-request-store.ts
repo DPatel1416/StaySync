@@ -9,6 +9,7 @@ export type ServiceRequest = {
   location: string;
   from: string;
   assigned: string;
+  assignedUser?: string;
   priority: string;
   status: string;
   due: string;

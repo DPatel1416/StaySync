@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ModulePage } from "./module-pages";
 import { getDepartmentNotifications } from "@/lib/notification-store";
 import { MaintenanceDashboard } from "./dashboard/workspaces";
+import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
+import { updateServiceRequest } from "@/lib/service-request-store";
 
 describe("Service Request reminders", () => {
   it("lets Front Desk notify the assigned department again", () => {
@@ -100,12 +102,63 @@ describe("Late checkout communication", () => {
 });
 
 describe("Housekeeping room assignments", () => {
-  it("allows a supervisor-authorized account to assign rooms and view ownership", () => {
+  it("allows a supervisor to assign several rooms in one action and view employee workloads", () => {
+    saveDemoEmployeeSession("priya.shah");
     render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
-    expect(screen.getByText("Housekeeping Supervisor access")).toBeInTheDocument();
-    const employee = screen.getByLabelText("Assigned employee for room 412");
-    fireEvent.change(employee, { target: { value: "Priya Shah" } });
-    expect(employee).toHaveValue("Priya Shah");
+    expect(screen.getByText("Supervisor assignment access")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Rooms"), { target: { value: "701-703, 710" } });
+    fireEvent.change(screen.getByLabelText("Assign to"), { target: { value: "Elena Ruiz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Assign rooms" }));
+    expect(screen.getByRole("status")).toHaveTextContent("4 rooms assigned successfully");
+    expect(screen.getByLabelText("Assigned employee for room 701")).toHaveValue("Elena Ruiz");
     expect(screen.getByLabelText("Assigned employee for room 518")).toHaveValue("Elena Ruiz");
+    clearDemoEmployeeSession();
+  });
+
+  it("shows an attendant only rooms assigned to that employee", () => {
+    saveDemoEmployeeSession("elena.ruiz");
+    render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
+    expect(screen.getByText("Personal assignment view")).toBeInTheDocument();
+    expect(screen.getByText("518")).toBeInTheDocument();
+    expect(screen.queryByText("307")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assign rooms" })).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
+  });
+});
+
+describe("Housekeeping service request routing", () => {
+  it("shows the complete Housekeeping queue to the supervisor", () => {
+    saveDemoEmployeeSession("priya.shah");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    expect(screen.getByText("SR-1048")).toBeInTheDocument();
+    expect(screen.getByText("SR-1044")).toBeInTheDocument();
+    expect(screen.queryByText("SR-1047")).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
+  });
+
+  it("shows a room attendant only requests assigned specifically to them", () => {
+    saveDemoEmployeeSession("elena.ruiz");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    expect(screen.getByText("SR-1044")).toBeInTheDocument();
+    expect(screen.queryByText("SR-1048")).not.toBeInTheDocument();
+    expect(screen.queryByText("SR-1047")).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
+  });
+
+  it("moves a queued request to the selected employee", () => {
+    saveDemoEmployeeSession("priya.shah");
+    const supervisor = render(<ModulePage role="housekeeping" module="service-requests"/>);
+    fireEvent.click(screen.getByRole("button", { name: /Open SR-1048/ }));
+    fireEvent.change(screen.getByLabelText("Assigned Housekeeping employee"), { target: { value: "Elena Ruiz" } });
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "Assigned" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    supervisor.unmount();
+
+    saveDemoEmployeeSession("elena.ruiz");
+    render(<ModulePage role="housekeeping" module="service-requests"/>);
+    expect(screen.getByText("SR-1048")).toBeInTheDocument();
+
+    act(() => updateServiceRequest({ id: "SR-1048", title: "Extra towels requested", location: "Room 718", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Standard", status: "Open", due: "10:30 AM" }));
+    clearDemoEmployeeSession();
   });
 });

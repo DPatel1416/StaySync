@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react";
-import { authenticateDemoEmployee } from "@/lib/demo-auth";
+import { authenticateDemoEmployee, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { Button } from "./ui/button";
 
 type Mode = "employee" | "holder";
@@ -33,6 +33,7 @@ export function LoginForm() {
         if (demoMode) {
           const employee = authenticateDemoEmployee(username, password);
           if (!employee) throw new Error("The username or password is incorrect.");
+          saveDemoEmployeeSession(username);
           if (form.get("rememberUsername")) window.localStorage.setItem("staysync-remembered-username", username.trim().toLowerCase());
           window.location.assign(`/app/${employee.workspace}`); return;
         }
@@ -48,7 +49,7 @@ export function LoginForm() {
       if (holderAction === "signup") {
         if (password !== String(form.get("confirmPassword"))) throw new Error("The passwords do not match.");
         if (demoMode) { window.location.assign("/app/manager"); return; }
-        const response = await fetch("/api/auth/account-holder/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, displayName: form.get("displayName"), organizationName: form.get("organizationName"), propertyName: form.get("propertyName") }) });
+        const response = await fetch("/api/auth/account-holder/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, displayName: form.get("displayName"), organizationName: form.get("organizationName"), propertyName: form.get("propertyName"), propertyRoomCount: Number(form.get("propertyRoomCount")) }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error ?? "We could not create your account.");
       }
@@ -72,7 +73,7 @@ export function LoginForm() {
     <p className="mt-3 text-[15px] leading-6 text-slate-500">{creatingAccount ? "Set up your organization and first property." : "Coordinate the day with your hotel team."}</p>
     <div className="mt-7 grid grid-cols-2 rounded-xl bg-slate-100 p-1 2xl:mt-8" role="tablist" aria-label="Account type">{(["employee", "holder"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={mode === item} onClick={() => chooseMode(item)} className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition ${mode === item ? "bg-white text-brand-strong shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "employee" ? "Employee" : "Account Holder"}</button>)}</div>
     <form onSubmit={submit} className="mt-6 space-y-4 2xl:mt-7">
-      {creatingAccount && <><label className="block"><span className="mb-2 block text-sm font-semibold text-slate-800">Your full name</span><input name="displayName" required autoComplete="name" className={inputClass} placeholder="Maya Chen"/></label><div className="grid gap-4 sm:grid-cols-2"><label><span className="mb-2 block text-sm font-semibold text-slate-800">Organization name</span><input name="organizationName" required className={inputClass} placeholder="Northstar Hotels"/></label><label><span className="mb-2 block text-sm font-semibold text-slate-800">First property</span><input name="propertyName" required className={inputClass} placeholder="Ottawa Downtown"/></label></div></>}
+      {creatingAccount && <><label className="block"><span className="mb-2 block text-sm font-semibold text-slate-800">Your full name</span><input name="displayName" required autoComplete="name" className={inputClass} placeholder="Maya Chen"/></label><div className="grid gap-4 sm:grid-cols-2"><label><span className="mb-2 block text-sm font-semibold text-slate-800">Organization name</span><input name="organizationName" required className={inputClass} placeholder="Northstar Hotels"/></label><label><span className="mb-2 block text-sm font-semibold text-slate-800">First property</span><input name="propertyName" required className={inputClass} placeholder="Ottawa Downtown"/></label></div><div><label htmlFor="property-room-count" className="mb-2 block text-sm font-semibold text-slate-800">Number of guest rooms</label><input id="property-room-count" name="propertyRoomCount" type="number" min="1" max="10000" required aria-describedby="property-room-count-help" className={inputClass} placeholder="142"/><span id="property-room-count-help" className="mt-1.5 block text-xs text-slate-500">Used to plan Housekeeping workload and room-assignment capacity.</span></div></>}
       <div><label htmlFor="identity" className="mb-2 block text-sm font-semibold text-slate-800">{mode === "employee" ? "Username" : "Email address"}</label><div className="relative"><span className="pointer-events-none absolute inset-y-0 left-0 grid w-11 place-items-center text-slate-400">{mode === "employee" ? <UserRound className="size-4"/> : <Mail className="size-4"/>}</span><input key={`${mode}-${holderAction}`} id="identity" name="identity" autoComplete={mode === "employee" ? "username" : "email"} type={mode === "employee" ? "text" : "email"} defaultValue={mode === "employee" ? "alex.morgan" : creatingAccount ? "" : "owner@northstar.demo"} required className={`${inputClass} pl-11`}/></div></div>
       <div><div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold text-slate-800">Password</label>{mode === "holder" && holderAction === "signin" && <a href="#" className="text-sm font-semibold text-brand hover:text-brand-strong">Forgot password?</a>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3.5 top-4 size-4 text-slate-400"/><input key={`password-${holderAction}`} id="password" name="password" type={show ? "text" : "password"} defaultValue={creatingAccount ? "" : "staysync-demo"} minLength={8} autoComplete={creatingAccount ? "new-password" : "current-password"} required onKeyUp={(event) => setCaps(event.getModifierState("CapsLock"))} className={`${inputClass} pl-11 pr-12`}/><button type="button" onClick={() => setShow((value) => !value)} className="absolute right-1 top-1 grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-50" aria-label={show ? "Hide password" : "Show password"}>{show ? <EyeOff className="size-4"/> : <Eye className="size-4"/>}</button></div>{caps && <p role="status" className="mt-2 text-sm text-amber-700">Caps Lock is on.</p>}</div>
       {creatingAccount && <label className="block"><span className="mb-2 block text-sm font-semibold text-slate-800">Confirm password</span><input name="confirmPassword" type={show ? "text" : "password"} minLength={8} autoComplete="new-password" required className={inputClass}/></label>}

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AlertTriangle, BellRing, BookPlus, CheckCircle2, ClipboardPlus, Clock3, FilePlus2, PackagePlus, Plus, RefreshCw, ShieldPlus, Sparkles, UserPlus, Wrench } from "lucide-react";
 import { workOrders } from "@/lib/demo-data";
 import { updateRoomUpdateState, useRoomUpdates } from "@/lib/room-update-store";
 import { useServiceRequests } from "@/lib/service-request-store";
 import { useDepartmentNotifications } from "@/lib/notification-store";
+import { demoEmployees, getDemoEmployeeSession, type DemoEmployee } from "@/lib/demo-auth";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader } from "../ui/card";
 import { ListRows, OperationsPreview, PageHeading, QuickActions } from "./shared";
@@ -23,8 +25,10 @@ export function FrontDeskDashboard() {
 
 export function HousekeepingDashboard() {
   const updates = useRoomUpdates();
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Housekeeping" description="Good morning, Priya. Room changes and assignments for Ottawa Downtown." actions={<CompactQualityScore department="Housekeeping" score={91}/>}/><QuickActions items={[{ label: "Update Room Status", icon: RefreshCw, primary: true, href: "/app/housekeeping/room-updates" }, { label: "Report Room Issue", icon: AlertTriangle, href: "/app/housekeeping/service-requests?create=1" }, { label: "Request Support", icon: ClipboardPlus, href: "/app/housekeeping/service-requests?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/housekeeping/operations-log?create=1" }]}/>
-    <DepartmentReminders department="Housekeeping" base="/app/housekeeping"/>
+  const [employee, setEmployee] = useState<DemoEmployee | null>(null);
+  useEffect(() => setEmployee(getDemoEmployeeSession("housekeeping") ?? demoEmployees["priya.shah"]), []);
+  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Housekeeping" description={`Good morning, ${employee?.name ?? "Housekeeping team"}. Room changes and assignments for Ottawa Downtown.`} actions={<CompactQualityScore department="Housekeeping" score={91}/>}/><QuickActions items={[{ label: "Update Room Status", icon: RefreshCw, primary: true, href: "/app/housekeeping/room-updates" }, { label: "Report Room Issue", icon: AlertTriangle, href: "/app/housekeeping/service-requests?create=1" }, { label: "Request Support", icon: ClipboardPlus, href: "/app/housekeeping/service-requests?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/housekeeping/operations-log?create=1" }]}/>
+    {employee?.isSupervisor && <DepartmentReminders department="Housekeeping" base="/app/housekeeping"/>}
     <RoomChangeSummary workspace="housekeeping"/>
     <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]"><Card><CardHeader title="Room status updates" description="Reservation changes that affect today’s assignments"/><div className="divide-y divide-slate-100">{updates.filter((update) => update.type !== "Late checkout").map((update, index) => { const key = update.id ?? `${update.room}-${update.type}`; return <article key={`${key}-${index}`} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:px-6"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft font-bold text-brand-strong">{update.room}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{update.type}</p><p className="mt-1 text-sm leading-5 text-slate-500">{update.detail}</p><p className="mt-1 text-xs text-slate-400">{update.time}</p></div><label className="min-w-40"><span className="sr-only">Status for room {update.room}</span><select aria-label={`Status for room ${update.room}`} value={update.state} onChange={(event) => updateRoomUpdateState(update.id, `${update.room}-${update.type}`, event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:border-brand"><option>Action needed</option><option>Assignment changed</option><option>Ready to assign</option><option>Waiting for clearance</option><option>Acknowledged</option><option>In Progress</option><option>Completed</option></select></label></article>; })}</div></Card><Card className="h-fit"><CardHeader title="Today’s rooms" action={<Link href="/app/housekeeping/assigned-rooms" className="text-xs font-semibold text-brand">Manage assignments</Link>}/><div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl bg-slate-100"><Metric label="Assigned" value="38"/><Metric label="Priority" value="7"/><Metric label="Ready" value="14"/><Metric label="Waiting" value="3"/></div></Card></div><OperationsPreview base="/app/housekeeping" role="housekeeping"/></div>;
 }

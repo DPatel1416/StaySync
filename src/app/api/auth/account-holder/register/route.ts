@@ -7,6 +7,7 @@ const registrationSchema = z.object({
   displayName: z.string().trim().min(2).max(100),
   organizationName: z.string().trim().min(2).max(120),
   propertyName: z.string().trim().min(2).max(120),
+  propertyRoomCount: z.number().int().min(1).max(10000),
   email: z.string().trim().email().max(254),
   password: z.string().min(8).max(256),
 });
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     const { data: organization, error: organizationError } = await admin.from("organizations").insert({ name: parsed.data.organizationName, slug }).select("id").single();
     if (organizationError || !organization) throw organizationError ?? new Error("Organization could not be created");
     organizationId = organization.id;
-    const { data: property, error: propertyError } = await admin.from("properties").insert({ organization_id: organization.id, name: parsed.data.propertyName, code: codeFrom(parsed.data.propertyName) }).select("id").single();
+    const { data: property, error: propertyError } = await admin.from("properties").insert({ organization_id: organization.id, name: parsed.data.propertyName, code: codeFrom(parsed.data.propertyName), room_count: parsed.data.propertyRoomCount }).select("id").single();
     if (propertyError || !property) throw propertyError ?? new Error("Property could not be created");
     const { error: departmentsError } = await admin.from("departments").insert([
       { organization_id: organization.id, property_id: property.id, name: "Front Desk", code: "FRONT_DESK", accent_color: "indigo" },
