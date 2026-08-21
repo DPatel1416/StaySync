@@ -6,6 +6,7 @@ import { MaintenanceDashboard } from "./dashboard/workspaces";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { updateServiceRequest } from "@/lib/service-request-store";
 import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
+import { isRoomUpdateVisible } from "@/lib/room-update-store";
 
 describe("Service Request reminders", () => {
   it("lets Front Desk notify the assigned department again", () => {
@@ -30,7 +31,7 @@ describe("Service Request reminders", () => {
     fireEvent.click(screen.getByRole("button", { name: "Notify Maintenance again about SR-1047" }));
     frontDesk.unmount();
     render(<MaintenanceDashboard/>);
-    expect(screen.getByRole("heading", { name: "Front Desk reminders" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Department notifications" })).toBeInTheDocument();
     expect(screen.getAllByText("Reminder: SR-1047").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /Reminder: SR-1047/ }).some((link) => link.getAttribute("href") === "/app/maintenance/service-requests?request=SR-1047")).toBe(true);
   });
@@ -82,7 +83,7 @@ describe("Late checkout communication", () => {
   it("publishes a Front Desk late checkout into Housekeeping room updates", () => {
     const frontDesk = render(<ModulePage role="front-desk" module="room-updates" create/>);
     fireEvent.change(screen.getByLabelText(/^Room number/), { target: { value: "825" } });
-    fireEvent.change(screen.getByLabelText(/^Checkout date/), { target: { value: "2026-08-17" } });
+    fireEvent.change(screen.getByLabelText(/^Checkout date/), { target: { value: "2099-08-17" } });
     fireEvent.change(screen.getByLabelText(/^New checkout time/), { target: { value: "14:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Notify Housekeeping" }));
     expect(screen.getByText("825")).toBeInTheDocument();
@@ -91,14 +92,46 @@ describe("Late checkout communication", () => {
 
     render(<ModulePage role="housekeeping" module="room-updates"/>);
     expect(screen.getByText("825")).toBeInTheDocument();
-    expect(screen.getByLabelText("Housekeeping status for room 825")).toHaveValue("Housekeeping notified");
+    const lateCheckout = screen.getByText("825").closest("article");
+    expect(lateCheckout).not.toBeNull();
+    expect(within(lateCheckout!).getByText("Information only")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Housekeeping status for room 825")).not.toBeInTheDocument();
+    expect(within(lateCheckout!).getByText(/Removed automatically at 6:00 PM/)).toBeInTheDocument();
   });
 
-  it("allows Housekeeping to update the operational status inline", () => {
+  it("keeps stayovers informational and allows other room changes to be updated", () => {
     render(<ModulePage role="housekeeping" module="room-updates"/>);
-    const status = screen.getByLabelText("Housekeeping status for room 412");
+    const stayover = screen.getByText("307").closest("article");
+    expect(stayover).not.toBeNull();
+    expect(within(stayover!).getByText("Information only")).toBeInTheDocument();
+    expect(within(stayover!).getByText(/Removed automatically at 6:00 PM/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Housekeeping status for room 307")).not.toBeInTheDocument();
+
+    const earlyCheckout = screen.getByText("518").closest("article");
+    expect(earlyCheckout).not.toBeNull();
+    expect(within(earlyCheckout!).getByText("Information only")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Housekeeping status for room 518")).not.toBeInTheDocument();
+
+    const status = screen.getByLabelText("Housekeeping status for room 604");
     fireEvent.change(status, { target: { value: "In Progress" } });
     expect(status).toHaveValue("In Progress");
+  });
+
+  it.each(["Late checkout", "Early checkout", "Extension · Stayover", "Extended stay"])("expires a %s precisely at 6 PM", (type) => {
+    const expiresAt = new Date("2026-08-17T18:00:00").getTime();
+    const update = { room: "412", type, detail: "Informational room change", time: "9:00 AM", state: "Information only", expiresAt };
+    expect(isRoomUpdateVisible(update, new Date("2026-08-17T17:59:59").getTime())).toBe(true);
+    expect(isRoomUpdateVisible(update, expiresAt)).toBe(false);
+  });
+
+  it("shows an attendant room updates only for personally assigned rooms", () => {
+    saveDemoEmployeeSession("elena.ruiz");
+    render(<ModulePage role="housekeeping" module="room-updates"/>);
+    expect(screen.getByText("518")).toBeInTheDocument();
+    expect(screen.queryByText("307")).not.toBeInTheDocument();
+    expect(screen.queryByText("412")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Update room status" })).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
   });
 });
 
@@ -177,14 +210,23 @@ describe("Housekeeping service request routing", () => {
     saveDemoEmployeeSession("sofia.martin");
     const supervisor = render(<ModulePage role="housekeeping" module="service-requests"/>);
     fireEvent.click(screen.getByRole("button", { name: /Open SR-1048/ }));
+    expect(screen.getByLabelText("Status")).toBeDisabled();
+    expect(screen.getByText("Status is updated by the assigned employee.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Assigned Housekeeping employee"), { target: { value: "Elena Ruiz" } });
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "Assigned" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText(/SR-1048 assigned to Elena Ruiz/)).toBeInTheDocument();
+    const persistedRequests = JSON.parse(window.localStorage.getItem("staysync-service-requests") ?? "[]") as Array<{ id: string; assignedUser?: string; status: string }>;
+    expect(persistedRequests.find((request) => request.id === "SR-1048")).toEqual(expect.objectContaining({ assignedUser: "Elena Ruiz", status: "Assigned", due: "10:30 AM" }));
     supervisor.unmount();
 
     saveDemoEmployeeSession("elena.ruiz");
     render(<ModulePage role="housekeeping" module="service-requests"/>);
     expect(screen.getByText("SR-1048")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Open SR-1048/ }));
+    expect(screen.getByLabelText("Status")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "In Progress" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText("In Progress")).toBeInTheDocument();
 
     act(() => updateServiceRequest({ id: "SR-1048", title: "Extra towels requested", location: "Room 718", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Standard", status: "Open", due: "10:30 AM" }));
     clearDemoEmployeeSession();

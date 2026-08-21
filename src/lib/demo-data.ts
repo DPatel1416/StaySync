@@ -22,12 +22,20 @@ export const serviceRequests = [
   { id: "SR-1044", title: "Remove used room-service tray", location: "Room 526", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Elena Ruiz", priority: "Standard", status: "Assigned", due: "12:00 PM" },
 ];
 
+const demoLateCheckoutExpiration = new Date();
+demoLateCheckoutExpiration.setHours(18, 0, 0, 0);
+
 export const roomUpdates = [
-  { room: "412", type: "Late checkout", detail: "Checkout changed from 11:00 AM to 1:00 PM.", time: "9:36 AM", state: "Action needed" },
-  { room: "307", type: "Extension · Stayover", detail: "Guest extended one night. Change departure clean to stayover service.", time: "9:12 AM", state: "Assignment changed" },
-  { room: "518", type: "Early checkout", detail: "Guest checked out today instead of tomorrow.", time: "8:54 AM", state: "Ready to assign" },
+  { room: "412", type: "Late checkout", detail: "Checkout changed from 11:00 AM to 1:00 PM.", time: "9:36 AM", state: "Information only", expiresAt: demoLateCheckoutExpiration.getTime() },
+  { room: "307", type: "Extension · Stayover", detail: "Guest extended one night. Change departure clean to stayover service.", time: "9:12 AM", state: "Information only", expiresAt: demoLateCheckoutExpiration.getTime() },
+  { room: "518", type: "Early checkout", detail: "Guest checked out today instead of tomorrow.", time: "8:54 AM", state: "Information only", expiresAt: demoLateCheckoutExpiration.getTime() },
   { room: "604", type: "Out of service", detail: "Do not clean until Maintenance clears the room.", time: "8:18 AM", state: "Waiting for clearance" },
 ];
+
+export const propertyDailyOperations = {
+  property: "Ottawa Downtown",
+  expectedDepartures: 38,
+};
 
 export const workOrders = [
   { id: "WO-284", title: "AC not cooling", location: "Room 604", priority: "Urgent", status: "In Progress", assignee: "Jordan Lee", age: "52 min" },

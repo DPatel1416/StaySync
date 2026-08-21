@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Check, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
 import { Button } from "./ui/button";
 
 const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-brand";
@@ -52,6 +52,16 @@ export function ServiceRequestDialog({ defaultOpen, onCreate }: { defaultOpen?: 
     <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Room or location</Label><input name="location" required className={inputClass} placeholder="Room 604 or Lobby"/></label><label><Label required>Assign to department</Label><select name="department" required defaultValue="" className={inputClass}><option value="" disabled>Select department</option><option>Housekeeping</option><option>Maintenance</option><option>Kitchen</option><option>Front Desk</option><option>Management</option></select></label></div>
     <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Priority</Label><select name="priority" required defaultValue="Standard" className={inputClass}><option>Standard</option><option>Important</option><option>High</option><option>Urgent</option></select></label><label><Label>Due date and time</Label><input name="due" type="datetime-local" className={inputClass}/></label></div>
     <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="notify" type="checkbox" defaultChecked className="size-4 rounded border-slate-300 text-brand"/>Notify the assigned department immediately</label>
+  </DialogFrame>;
+}
+
+export type HousekeepingRoomIssueDraft = { room: string; issue: string; description: string; urgency: string };
+export function HousekeepingRoomIssueDialog({ onCreate }: { onCreate: (draft: HousekeepingRoomIssueDraft) => void }) {
+  return <DialogFrame title="Report room issue" description="Send an issue from one of your assigned rooms directly to the Housekeeping supervisor." triggerLabel="Report room issue" submitLabel="Send to supervisor" icon={AlertTriangle} onSubmit={(data) => onCreate({ room: String(data.get("room")), issue: String(data.get("issue")), description: String(data.get("description")), urgency: String(data.get("urgency")) })}>
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Only Housekeeping supervisors receive this report. They can review it and assign the follow-up work.</div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Room number</Label><input name="room" required inputMode="numeric" className={inputClass} placeholder="307"/></label><label><Label required>Issue type</Label><select name="issue" required defaultValue="" className={inputClass}><option value="" disabled>Select issue</option><option>Cleaning supplies needed</option><option>Linen or bedding</option><option>Room damage</option><option>Missing item</option><option>Maintenance needed</option><option>Safety concern</option><option>Other</option></select></label></div>
+    <label className="block"><Label required>What did you find?</Label><textarea name="description" required rows={3} className={textareaClass} placeholder="Add the details your supervisor needs to decide the next action."/></label>
+    <label><Label required>Urgency</Label><select name="urgency" required defaultValue="Standard" className={inputClass}><option>Standard</option><option>Important</option><option>Urgent</option></select></label>
   </DialogFrame>;
 }
 

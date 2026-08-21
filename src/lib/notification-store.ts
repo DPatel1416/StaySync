@@ -12,6 +12,7 @@ export type DepartmentNotification = {
   createdBy: string;
   readAt?: number;
   audience?: "DEPARTMENT" | "SUPERVISORS";
+  tone?: "info" | "warning" | "urgent";
 };
 
 let notifications: DepartmentNotification[] = [];
@@ -57,7 +58,34 @@ export function sendDepartmentReminder(notification: Omit<DepartmentNotification
   notifications = [created, ...notifications];
   persist();
   notify();
+  playNotificationSound(notification.tone === "urgent" ? "urgent" : "standard");
   return created;
+}
+
+function playNotificationSound(kind: "standard" | "urgent") {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    const tones = kind === "urgent" ? [660, 880, 660] : [660];
+    tones.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startsAt = context.currentTime + index * 0.16;
+      oscillator.frequency.value = frequency;
+      oscillator.type = "sine";
+      gain.gain.setValueAtTime(0.0001, startsAt);
+      gain.gain.exponentialRampToValueAtTime(0.12, startsAt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + 0.12);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(startsAt);
+      oscillator.stop(startsAt + 0.13);
+    });
+    window.setTimeout(() => void context.close(), kind === "urgent" ? 650 : 250);
+  } catch {
+    // Browsers may block sound until the user has interacted with the page.
+  }
 }
 
 export function getDepartmentNotifications() {
