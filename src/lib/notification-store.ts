@@ -15,6 +15,7 @@ export type DepartmentNotification = {
   readAt?: number;
   audience?: "DEPARTMENT" | "SUPERVISORS";
   tone?: "info" | "warning" | "urgent";
+  kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "INSPECTION";
 };
 
 let notifications: DepartmentNotification[] = [];
@@ -94,6 +95,14 @@ export function markDepartmentNotificationsRead(department: string, isSupervisor
   hydrate();
   const readAt = Date.now();
   notifications = notifications.map((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor) && !notification.readAt ? { ...notification, readAt } : notification);
+  persist();
+  notify();
+}
+
+export function markDepartmentNotificationRead(id: string) {
+  hydrate();
+  const readAt = Date.now();
+  notifications = notifications.map((notification) => notification.id === id && !notification.readAt ? { ...notification, readAt } : notification);
   persist();
   notify();
 }

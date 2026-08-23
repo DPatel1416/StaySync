@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, Check, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, BellRing, Check, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
 import { Button } from "./ui/button";
 
 const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-brand";
@@ -62,6 +62,16 @@ export function HousekeepingRoomIssueDialog({ onCreate }: { onCreate: (draft: Ho
     <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Room number</Label><input name="room" required inputMode="numeric" className={inputClass} placeholder="307"/></label><label><Label required>Issue type</Label><select name="issue" required defaultValue="" className={inputClass}><option value="" disabled>Select issue</option><option>Cleaning supplies needed</option><option>Linen or bedding</option><option>Room damage</option><option>Missing item</option><option>Maintenance needed</option><option>Safety concern</option><option>Other</option></select></label></div>
     <label className="block"><Label required>What did you find?</Label><textarea name="description" required rows={3} className={textareaClass} placeholder="Add the details your supervisor needs to decide the next action."/></label>
     <label><Label required>Urgency</Label><select name="urgency" required defaultValue="Standard" className={inputClass}><option>Standard</option><option>Important</option><option>Urgent</option></select></label>
+  </DialogFrame>;
+}
+
+export type HousekeepingSosDraft = { location: string; note: string };
+export function HousekeepingSosDialog({ locations, onSend }: { locations: string[]; onSend: (draft: HousekeepingSosDraft) => void }) {
+  const suggestions = [...new Set(locations)];
+  return <DialogFrame title="Emergency SOS" description="Tell your Housekeeping supervisor where you are so they can come directly to you." triggerLabel="Emergency SOS" submitLabel="Send SOS" icon={BellRing} onSubmit={(data) => onSend({ location: String(data.get("location")), note: String(data.get("note")) })}>
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-950">This sends a direct emergency alert to your supervisor. It does not create a service request or assign work to another attendant.</div>
+    <label className="block"><Label required>Current room or location</Label><input name="location" required list="housekeeping-sos-locations" className={inputClass} placeholder="Room 307, third-floor hall, or linen room" autoComplete="off"/><datalist id="housekeeping-sos-locations">{suggestions.map((location) => <option key={location} value={location}/>)}</datalist><span className="mt-1.5 block text-xs text-slate-500">Choose an assigned room or enter your exact current location.</span></label>
+    <label className="block"><Label>What help do you need?</Label><textarea name="note" rows={2} className={textareaClass} placeholder="Optional short detail for your supervisor."/></label>
   </DialogFrame>;
 }
 

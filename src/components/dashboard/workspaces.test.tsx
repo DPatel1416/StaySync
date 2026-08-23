@@ -3,6 +3,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
 import { updateServiceRequest } from "@/lib/service-request-store";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
+import { getDepartmentNotifications } from "@/lib/notification-store";
 
 vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -53,7 +54,7 @@ describe("dynamic room-change summaries", () => {
     expect(screen.queryByText("Room 412 · Late checkout")).not.toBeInTheDocument();
   });
 
-  it("sends room issues and emergency SOS alerts only to Housekeeping supervisors", async () => {
+  it("sends room issues only to Housekeeping supervisors", async () => {
     saveDemoEmployeeSession("priya.shah");
     render(<HousekeepingDashboard/>);
     fireEvent.click(screen.getByRole("button", { name: "Report room issue" }));
@@ -62,8 +63,28 @@ describe("dynamic room-change summaries", () => {
     fireEvent.change(screen.getByLabelText(/^What did you find/), { target: { value: "Duvet cover is torn and needs replacement." } });
     fireEvent.click(screen.getByRole("button", { name: "Send to supervisor" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Room issue sent to your supervisor"));
+  });
+
+  it("sends a location-aware SOS directly to the supervisor and removes it once acknowledged", async () => {
+    saveDemoEmployeeSession("priya.shah");
+    const beforeRequests = window.localStorage.getItem("staysync-service-requests");
+    const attendantView = render(<HousekeepingDashboard/>);
     fireEvent.click(screen.getByRole("button", { name: /Emergency SOS/ }));
-    expect(screen.getByRole("status")).toHaveTextContent("Emergency SOS sent");
+    fireEvent.change(screen.getByLabelText(/^Current room or location/), { target: { value: "Room 307" } });
+    fireEvent.change(screen.getByLabelText(/^What help do you need/), { target: { value: "Need immediate supervisor assistance." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send SOS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Emergency SOS sent from Room 307");
+    expect(window.localStorage.getItem("staysync-service-requests")).toBe(beforeRequests);
+
+    attendantView.unmount();
+    saveDemoEmployeeSession("sofia.martin");
+    render(<HousekeepingDashboard/>);
+    expect(screen.getByText("Priya Shah needs help")).toBeInTheDocument();
+    expect(screen.getByText("SOS at Room 307. Need immediate supervisor assistance.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge SOS from Priya Shah" }));
+    expect(screen.queryByText("Priya Shah needs help")).not.toBeInTheDocument();
+    expect(getDepartmentNotifications().find((notification) => notification.kind === "SOS" && notification.createdBy === "Priya Shah")?.readAt).toBeDefined();
   });
 
   it("shows Housekeeping quality score in the dashboard heading", () => {

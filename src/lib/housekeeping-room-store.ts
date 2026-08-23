@@ -55,7 +55,7 @@ export function updateHousekeepingRoom(room: string, changes: Partial<Pick<House
   persist();
   notify();
   if (changes.status === "Ready to inspect" && previous?.status !== "Ready to inspect") {
-    sendDepartmentReminder({ department: "Housekeeping", title: `Room ${room} ready for inspection`, message: `${previous?.assignedTo ?? "The assigned attendant"} marked room ${room} ready for supervisor inspection.`, serviceRequestId: `room-${room}`, href: "/app/housekeeping/assigned-rooms", createdBy: previous?.assignedTo ?? "Housekeeping attendant", audience: "SUPERVISORS", tone: "warning" });
+    sendDepartmentReminder({ department: "Housekeeping", title: `Room ${room} ready for inspection`, message: `${previous?.assignedTo ?? "The assigned attendant"} marked room ${room} ready for supervisor inspection.`, serviceRequestId: `room-${room}`, href: "/app/housekeeping/assigned-rooms", createdBy: previous?.assignedTo ?? "Housekeeping attendant", audience: "SUPERVISORS", tone: "warning", kind: "INSPECTION" });
   }
 }
 
