@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
 export type DepartmentNotification = {
   id: string;
@@ -20,7 +21,6 @@ let notifications: DepartmentNotification[] = [];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-department-notifications";
 let hydrated = false;
-let listeningForStorage = false;
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
@@ -31,18 +31,14 @@ function hydrate() {
   } catch {
     notifications = [];
   }
-  if (!listeningForStorage) {
-    listeningForStorage = true;
-    window.addEventListener("storage", (event) => {
-      if (event.key !== storageKey) return;
-      try { notifications = event.newValue ? JSON.parse(event.newValue) as DepartmentNotification[] : []; } catch { notifications = []; }
-      notify();
-    });
-  }
+  subscribeBrowserState(storageKey, (value) => {
+    try { notifications = value ? JSON.parse(value) as DepartmentNotification[] : []; } catch { notifications = []; }
+    notify();
+  });
 }
 
 function persist() {
-  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(notifications));
+  publishBrowserState(storageKey, JSON.stringify(notifications));
 }
 
 function notify() {

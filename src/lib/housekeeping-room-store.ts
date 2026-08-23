@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { sendDepartmentReminder } from "./notification-store";
+import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
 export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready to inspect" | "Inspected" | "Waiting";
 
@@ -25,7 +26,6 @@ let assignments = [...seedAssignments];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-housekeeping-room-board";
 let hydrated = false;
-let listeningForStorage = false;
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
@@ -36,18 +36,14 @@ function hydrate() {
   } catch {
     assignments = [...seedAssignments];
   }
-  if (!listeningForStorage) {
-    listeningForStorage = true;
-    window.addEventListener("storage", (event) => {
-      if (event.key !== storageKey) return;
-      try { assignments = event.newValue ? JSON.parse(event.newValue) as HousekeepingRoomAssignment[] : [...seedAssignments]; } catch { assignments = [...seedAssignments]; }
-      notify();
-    });
-  }
+  subscribeBrowserState(storageKey, (value) => {
+    try { assignments = value ? JSON.parse(value) as HousekeepingRoomAssignment[] : [...seedAssignments]; } catch { assignments = [...seedAssignments]; }
+    notify();
+  });
 }
 
 function persist() {
-  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(assignments));
+  publishBrowserState(storageKey, JSON.stringify(assignments));
 }
 
 function notify() { listeners.forEach((listener) => listener()); }

@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { serviceRequests as seedServiceRequests } from "./demo-data";
+import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
 export type ServiceRequest = {
   id: string;
@@ -23,7 +24,6 @@ let requests: ServiceRequest[] = [...seed];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-service-requests";
 let hydrated = false;
-let listeningForStorage = false;
 
 function notify() { listeners.forEach((listener) => listener()); }
 
@@ -36,18 +36,14 @@ function hydrate() {
   } catch {
     requests = [...seed];
   }
-  if (!listeningForStorage) {
-    listeningForStorage = true;
-    window.addEventListener("storage", (event) => {
-      if (event.key !== storageKey) return;
-      try { requests = event.newValue ? JSON.parse(event.newValue) as ServiceRequest[] : [...seed]; } catch { requests = [...seed]; }
-      notify();
-    });
-  }
+  subscribeBrowserState(storageKey, (value) => {
+    try { requests = value ? JSON.parse(value) as ServiceRequest[] : [...seed]; } catch { requests = [...seed]; }
+    notify();
+  });
 }
 
 function persist() {
-  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(requests));
+  publishBrowserState(storageKey, JSON.stringify(requests));
 }
 
 export function addServiceRequest(request: ServiceRequest) {

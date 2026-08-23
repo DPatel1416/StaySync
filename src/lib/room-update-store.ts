@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { roomUpdates as seedRoomUpdates } from "./demo-data";
+import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
 export type RoomUpdate = { id?: string; room: string; type: string; detail: string; time: string; state: string; createdBy?: string; expiresAt?: number };
 
@@ -9,7 +10,6 @@ let updates: RoomUpdate[] = [...seedRoomUpdates];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-room-updates";
 let hydrated = false;
-let listeningForStorage = false;
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
@@ -20,18 +20,14 @@ function hydrate() {
   } catch {
     updates = [...seedRoomUpdates];
   }
-  if (!listeningForStorage) {
-    listeningForStorage = true;
-    window.addEventListener("storage", (event) => {
-      if (event.key !== storageKey) return;
-      try { updates = event.newValue ? JSON.parse(event.newValue) as RoomUpdate[] : [...seedRoomUpdates]; } catch { updates = [...seedRoomUpdates]; }
-      listeners.forEach((listener) => listener());
-    });
-  }
+  subscribeBrowserState(storageKey, (value) => {
+    try { updates = value ? JSON.parse(value) as RoomUpdate[] : [...seedRoomUpdates]; } catch { updates = [...seedRoomUpdates]; }
+    listeners.forEach((listener) => listener());
+  });
 }
 
 function persist() {
-  if (typeof window !== "undefined") window.localStorage.setItem(storageKey, JSON.stringify(updates));
+  publishBrowserState(storageKey, JSON.stringify(updates));
 }
 
 export function addRoomUpdate(update: RoomUpdate) {

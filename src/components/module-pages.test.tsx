@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { ModulePage } from "./module-pages";
 import { getDepartmentNotifications } from "@/lib/notification-store";
 import { MaintenanceDashboard } from "./dashboard/workspaces";
@@ -8,6 +8,12 @@ import { addServiceRequest, deleteServiceRequest, updateServiceRequest } from "@
 import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
 import { isRoomUpdateVisible } from "@/lib/room-update-store";
 import { serviceRequests as demoServiceRequests } from "@/lib/demo-data";
+
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-23T10:00:00"));
+});
+afterAll(() => vi.useRealTimers());
 
 describe("Service Request reminders", () => {
   it("notifies the Housekeeping supervisor when a new request is created", () => {

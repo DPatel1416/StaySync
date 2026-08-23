@@ -1,8 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
 import { updateServiceRequest } from "@/lib/service-request-store";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
+
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-23T10:00:00"));
+});
+afterAll(() => vi.useRealTimers());
 
 afterEach(() => clearDemoEmployeeSession());
 
