@@ -182,6 +182,12 @@ describe("Maintenance workflows", () => {
     render(<ModulePage role="maintenance" module="maintenance-reports"/>);
     expect(screen.getByRole("heading", { name: "Repeat room issues" })).toBeInTheDocument();
     expect(screen.getByText("Room 604")).toBeInTheDocument();
+    expect(screen.getByLabelText("Maintenance report month")).toHaveValue("");
+    fireEvent.change(screen.getByLabelText("Maintenance report month"), { target: { value: "6" } });
+    expect(screen.queryByText("Room 604")).not.toBeInTheDocument();
+    expect(screen.getByText(/No guest-room issues match all maintenance for July 2026/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Maintenance report month"), { target: { value: "7" } });
+    expect(screen.getByText("Room 604")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Maintenance report type"), { target: { value: "Preventive Maintenance" } });
     expect(screen.queryByText("Room 604")).not.toBeInTheDocument();
     expect(screen.getByText(/No guest-room issues match preventive maintenance/)).toBeInTheDocument();
