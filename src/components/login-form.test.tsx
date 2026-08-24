@@ -8,6 +8,7 @@ describe("LoginForm", () => {
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.queryByLabelText("Email address")).not.toBeInTheDocument();
     expect(screen.queryByText(/property code/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enter StaySync" })).toBeInTheDocument();
   });
 
   it("switches to account-holder email authentication", () => {

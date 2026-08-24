@@ -86,21 +86,84 @@ a, button, input, select, textarea { outline: none; }
   --brand-muted: 237 233 254;
   --brand-border: 221 214 254;
 }
-[data-login-theme="ocean"] {
-  --brand: var(--identity);
-  --brand-strong: var(--identity-strong);
-  --brand-soft: var(--identity-soft);
-  --brand-muted: var(--identity-muted);
-  --brand-border: var(--identity-border);
+[data-login-theme="atelier"] {
+  --brand: 190 65 50;
+  --brand-strong: 143 45 37;
+  --brand-soft: 255 244 240;
+  --brand-muted: 250 222 214;
+  --brand-border: 239 197 186;
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
-.login-grid {
-  background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
-  background-size: 48px 48px;
+.login-shell { font-family: Arial, Helvetica, sans-serif; }
+.login-stage {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 70% 62%, rgba(179, 67, 57, .18), transparent 28rem),
+    linear-gradient(145deg, #210d19 0%, #321526 46%, #4a211f 100%);
 }
+.login-stage::before {
+  position: absolute;
+  width: 42rem;
+  height: 42rem;
+  right: -20rem;
+  top: -22rem;
+  border-radius: 9999px;
+  content: "";
+  border: 1px solid rgba(255, 227, 218, .12);
+  box-shadow: 0 0 0 8rem rgba(255,255,255,.012), 0 0 0 16rem rgba(255,255,255,.008);
+  pointer-events: none;
+}
+.login-stage::after {
+  position: absolute;
+  inset: auto auto -17rem -18rem;
+  width: 39rem;
+  height: 39rem;
+  border-radius: 9999px;
+  content: "";
+  border: 1px solid rgba(255, 227, 218, .09);
+  box-shadow: 0 0 0 7rem rgba(255,255,255,.01), 0 0 0 14rem rgba(255,255,255,.006);
+  pointer-events: none;
+}
+.login-access {
+  background:
+    radial-gradient(circle at 93% 2%, rgba(240, 113, 93, .12), transparent 25rem),
+    radial-gradient(circle at 5% 96%, rgba(218, 165, 116, .08), transparent 22rem),
+    #fbf7f2;
+}
+.login-glow {
+  position: absolute;
+  width: 30rem;
+  height: 30rem;
+  border-radius: 9999px;
+  filter: blur(100px);
+  opacity: .16;
+  pointer-events: none;
+}
+.login-glow-one { right: 5%; top: 8%; background: #b74339; }
+.login-glow-two { bottom: 0; left: 10%; background: #d69f70; }
+.login-live-panel::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(110deg, rgba(255,255,255,.045), transparent 36%);
+  pointer-events: none;
+}
+.login-live-dot { box-shadow: 0 0 0 0 rgba(240,113,93,.45); animation: login-pulse 2.8s ease-out infinite; }
+.login-event { animation: login-event 6s ease-in-out infinite; }
+.login-ribbon-base { fill: none; stroke: rgba(244,164,142,.22); stroke-width: 1.2; }
+.login-ribbon-flow { fill: none; stroke: #f4a48e; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 30 260; filter: drop-shadow(0 0 5px rgba(240,113,93,.8)); animation: login-flow 6s linear infinite; }
+.login-reveal { animation: login-reveal .7s cubic-bezier(.22,1,.36,1) both; }
+.login-reveal-delay { animation-delay: .1s; }
+.login-reveal-delay-two { animation-delay: .2s; }
+.login-reveal-delay-three { animation-delay: .3s; }
+@keyframes login-flow { to { stroke-dashoffset: -290; } }
+@keyframes login-pulse { 50% { box-shadow: 0 0 0 7px rgba(240,113,93,0); } }
+@keyframes login-event { 0%, 100% { background: transparent; } 12%, 25% { background: rgba(255,255,255,.055); } }
+@keyframes login-reveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-height: 760px) and (min-width: 1024px) { .login-stage { padding-top: 1.5rem; padding-bottom: 1.5rem; } }
 .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }
