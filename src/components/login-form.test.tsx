@@ -23,11 +23,11 @@ describe("LoginForm", () => {
     render(<LoginForm/>);
     fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(screen.getByRole("heading", { name: "Create your hotel account" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create your account" })).toBeInTheDocument();
     expect(screen.getByLabelText("Your full name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Organization name")).toBeInTheDocument();
-    expect(screen.getByLabelText("First property")).toBeInTheDocument();
-    expect(screen.getByLabelText("Number of guest rooms")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Organization name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("First property")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Number of guest rooms")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Confirm password")).toBeInTheDocument();
   });
 
