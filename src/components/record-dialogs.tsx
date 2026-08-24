@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, BellRing, Check, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, BellRing, Check, PackageSearch, Plus, ShieldAlert, Wrench, X } from "lucide-react";
 import { Button } from "./ui/button";
 
 const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-brand";
@@ -72,6 +72,19 @@ export function HousekeepingSosDialog({ locations, onSend }: { locations: string
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-950">This sends a direct emergency alert to your supervisor. It does not create a service request or assign work to another attendant.</div>
     <label className="block"><Label required>Current room or location</Label><input name="location" required list="housekeeping-sos-locations" className={inputClass} placeholder="Room 307, third-floor hall, or linen room" autoComplete="off"/><datalist id="housekeeping-sos-locations">{suggestions.map((location) => <option key={location} value={location}/>)}</datalist><span className="mt-1.5 block text-xs text-slate-500">Choose an assigned room or enter your exact current location.</span></label>
     <label className="block"><Label>What help do you need?</Label><textarea name="note" rows={2} className={textareaClass} placeholder="Optional short detail for your supervisor."/></label>
+  </DialogFrame>;
+}
+
+export type WorkOrderDraft = { title: string; description: string; location: string; category: string; priority: string; assignee: string; due: string; requiresHousekeepingClearance: boolean };
+export function WorkOrderDialog({ defaultOpen, onCreate }: { defaultOpen?: boolean; onCreate: (draft: WorkOrderDraft) => void }) {
+  return <DialogFrame title="Create work order" description="Create an internal Maintenance record for a repair, inspection, or preventive task." triggerLabel="Create work order" submitLabel="Create work order" defaultOpen={defaultOpen} icon={Wrench} onSubmit={(data) => onCreate({ title: String(data.get("title")), description: String(data.get("description")), location: String(data.get("location")), category: String(data.get("category")), priority: String(data.get("priority")), assignee: String(data.get("assignee")), due: String(data.get("due")), requiresHousekeepingClearance: data.get("requiresHousekeepingClearance") === "on" })}>
+    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm leading-5 text-sky-900"><strong>Work order:</strong> Maintenance’s internal job record. Requests sent by other departments remain under Service Requests.</div>
+    <label className="block"><Label required>Work title</Label><input name="title" required className={inputClass} placeholder="Repair guest room air conditioner"/></label>
+    <label className="block"><Label required>Problem and required work</Label><textarea name="description" required rows={3} className={textareaClass} placeholder="Describe the fault, checks already completed, and expected repair."/></label>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Room or location</Label><input name="location" required className={inputClass} placeholder="Room 604 or East elevator"/></label><label><Label required>Category</Label><select name="category" required defaultValue="" className={inputClass}><option value="" disabled>Select category</option><option>HVAC</option><option>Plumbing</option><option>Electrical</option><option>Equipment</option><option>Furniture and fixtures</option><option>Safety</option><option>Preventive maintenance</option><option>Other</option></select></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Priority</Label><select name="priority" required defaultValue="Standard" className={inputClass}><option>Standard</option><option>High</option><option>Urgent</option></select></label><label><Label required>Assigned technician</Label><select name="assignee" required defaultValue="Unassigned" className={inputClass}><option>Unassigned</option><option>Jordan Lee</option><option>Sam Rivera</option></select></label></div>
+    <label><Label>Due date and time</Label><input name="due" type="datetime-local" className={inputClass}/></label>
+    <label className="flex min-h-11 items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><input name="requiresHousekeepingClearance" type="checkbox" className="mt-0.5 size-4 rounded border-amber-300 text-brand"/><span><strong className="block">Housekeeping is waiting for room clearance</strong><span className="mt-0.5 block text-xs leading-5 text-amber-800">When this work is completed and the room is released, the Housekeeping supervisor will be notified.</span></span></label>
   </DialogFrame>;
 }
 

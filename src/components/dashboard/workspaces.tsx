@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, BellRing, BookPlus, CheckCircle2, ClipboardPlus, Clock3, FilePlus2, PackagePlus, Plus, ShieldPlus, Sparkles, UserPlus, Wrench } from "lucide-react";
-import { propertyDailyOperations, workOrders } from "@/lib/demo-data";
+import { propertyDailyOperations } from "@/lib/demo-data";
 import { isInformationalRoomChange, useRoomUpdates } from "@/lib/room-update-store";
 import { addServiceRequest, useServiceRequests } from "@/lib/service-request-store";
 import { markDepartmentNotificationRead, sendDepartmentReminder, useDepartmentNotifications } from "@/lib/notification-store";
@@ -13,6 +13,7 @@ import { HousekeepingRoomIssueDialog, HousekeepingSosDialog, type HousekeepingRo
 import { Badge } from "../ui/badge";
 import { Card, CardHeader } from "../ui/card";
 import { ListRows, OperationsPreview, PageHeading, QuickActions } from "./shared";
+import { useWorkOrders } from "@/lib/work-order-store";
 
 export function FrontDeskDashboard() {
   const requests = useServiceRequests();
@@ -72,9 +73,11 @@ function AssignedRoomChanges({ roomNumbers }: { roomNumbers: string[] }) {
 }
 
 export function MaintenanceDashboard() {
+  const workOrders = useWorkOrders();
+  const priorityWork = workOrders.filter((order) => order.status !== "Completed" && order.status !== "Cancelled" && (order.priority === "Urgent" || order.priority === "High"));
   return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Maintenance" description="Good morning, Jordan. Prioritized work for Ottawa Downtown." actions={<CompactQualityScore department="Maintenance" score={96}/>}/><QuickActions items={[{ label: "Create Work Order", icon: Wrench, primary: true, href: "/app/maintenance/work-orders?create=1" }, { label: "Report Completion", icon: CheckCircle2, href: "/app/maintenance/work-orders" }, { label: "Request Support", icon: ClipboardPlus, href: "/app/maintenance/service-requests?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/maintenance/operations-log?create=1" }]}/>
     <DepartmentReminders department="Maintenance" base="/app/maintenance"/>
-    <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader title="Priority work" description="Urgent and high-priority work orders first"/><div className="divide-y divide-slate-100">{workOrders.map((order) => <button key={order.id} className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 sm:px-6"><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${order.priority === "Urgent" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}><Wrench className="size-4"/></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{order.id} · {order.title}</p><p className="mt-1 text-sm text-slate-500">{order.location} · {order.assignee}</p></div><Badge tone={order.priority === "Urgent" ? "urgent" : order.priority === "High" ? "warning" : "neutral"}>{order.status}</Badge><span className="hidden text-xs text-slate-400 sm:block">{order.age}</span></button>)}</div></Card><Card className="h-fit"><CardHeader title="Workload"/><ListRows rows={[{ title: "Preventive maintenance due", detail: "5 inspections due this week", badge: "5", tone: "warning" }, { title: "Recurring room issues", detail: "3 rooms with repeat reports", badge: "Review", tone: "urgent" }, { title: "Waiting for parts", detail: "2 work orders paused", badge: "2", tone: "neutral" }]}/></Card></div><OperationsPreview base="/app/maintenance" role="maintenance"/></div>;
+    <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader title="Priority work" description="Urgent and high-priority Maintenance work only"/><div className="divide-y divide-slate-100">{priorityWork.map((order) => <Link href={`/app/maintenance/work-orders?request=${order.id}`} key={order.id} className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 sm:px-6"><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${order.priority === "Urgent" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}><Wrench className="size-4"/></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{order.id} · {order.title}</p><p className="mt-1 text-sm text-slate-500">{order.location} · {order.assignee}</p></div><Badge tone={order.priority === "Urgent" ? "urgent" : "warning"}>{order.status}</Badge><span className="hidden text-xs text-slate-400 sm:block">{order.age}</span></Link>)}{priorityWork.length === 0 && <DashboardEmpty message="No urgent or high-priority Maintenance work."/>}</div></Card><Card className="h-fit"><CardHeader title="Workload"/><ListRows rows={[{ title: "Preventive maintenance due", detail: "5 inspections due this week", badge: "5", tone: "warning" }, { title: "Recurring room issues", detail: "3 rooms with repeat reports", badge: "Review", tone: "urgent" }, { title: "Waiting for parts", detail: "2 work orders paused", badge: "2", tone: "neutral" }]}/></Card></div><OperationsPreview base="/app/maintenance" role="maintenance"/></div>;
 }
 
 export function ManagerDashboard() {

@@ -27,17 +27,29 @@ let hydrated = false;
 
 function notify() { listeners.forEach((listener) => listener()); }
 
+function removeLegacySosRequests(value: ServiceRequest[]) {
+  return value.filter((request) => !request.id.startsWith("SOS-"));
+}
+
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
   try {
     const stored = window.localStorage.getItem(storageKey);
-    if (stored) requests = JSON.parse(stored) as ServiceRequest[];
+    if (stored) {
+      const storedRequests = JSON.parse(stored) as ServiceRequest[];
+      requests = removeLegacySosRequests(storedRequests);
+      if (requests.length !== storedRequests.length) persist();
+    }
   } catch {
     requests = [...seed];
   }
   subscribeBrowserState(storageKey, (value) => {
-    try { requests = value ? JSON.parse(value) as ServiceRequest[] : [...seed]; } catch { requests = [...seed]; }
+    try {
+      const incoming = value ? JSON.parse(value) as ServiceRequest[] : [...seed];
+      requests = removeLegacySosRequests(incoming);
+      if (requests.length !== incoming.length) persist();
+    } catch { requests = [...seed]; }
     notify();
   });
 }
@@ -65,6 +77,11 @@ export function deleteServiceRequest(id: string) {
   requests = requests.filter((request) => request.id !== id);
   persist();
   notify();
+}
+
+export function getServiceRequests() {
+  hydrate();
+  return requests;
 }
 
 export function useServiceRequests() {

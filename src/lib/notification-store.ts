@@ -15,7 +15,7 @@ export type DepartmentNotification = {
   readAt?: number;
   audience?: "DEPARTMENT" | "SUPERVISORS";
   tone?: "info" | "warning" | "urgent";
-  kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "INSPECTION";
+  kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "INSPECTION" | "ROOM_CLEARANCE";
 };
 
 let notifications: DepartmentNotification[] = [];

@@ -4,6 +4,7 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { LockKeyhole, X } from "lucide-react";
 import { Button } from "./ui/button";
+import type { WorkOrder } from "@/lib/work-order-store";
 
 const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-brand disabled:bg-slate-50 disabled:text-slate-500";
 const textareaClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand disabled:bg-slate-50 disabled:text-slate-500";
@@ -29,6 +30,22 @@ export function ServiceRequestEditor({ request, currentDepartment = "Front Desk"
     {isHousekeeping && isDepartmentSupervisor && <label><Label>Assigned Housekeeping employee</Label><select name="assignedUser" defaultValue={request.assignedUser ?? "Unassigned"} className={inputClass}>{assigneeOptions.map((employee) => <option key={employee}>{employee}</option>)}</select></label>}
     <div className="grid gap-4 sm:grid-cols-2"><label><Label>Priority</Label><select name="priority" defaultValue={request.priority} disabled={!canEdit || isHousekeeping} className={inputClass}><option>Standard</option><option>Important</option><option>High</option><option>Urgent</option></select></label><label><Label>Due</Label><input name="due" defaultValue={request.due} disabled={!canEdit || isHousekeeping} className={inputClass}/></label></div>
     <label><Label>Update note</Label><textarea name="note" rows={3} disabled={!canEdit} className={textareaClass} placeholder="Explain what changed or what happens next."/></label>
+  </EditorFrame>;
+}
+
+export function WorkOrderEditor({ workOrder, onClose, onSave }: { workOrder: WorkOrder | null; onClose: () => void; onSave: (workOrder: WorkOrder, releasedToHousekeeping: boolean) => void }) {
+  if (!workOrder) return null;
+  const roomNumber = workOrder.location.match(/^Room\s+(\d+)/i)?.[1];
+  return <EditorFrame open title={`Update ${workOrder.id}`} description="Record Maintenance progress, assignment, and completion details." canEdit onClose={onClose} onSubmit={(data) => {
+    const status = String(data.get("status")) as WorkOrder["status"];
+    const released = data.get("releasedToHousekeeping") === "on";
+    onSave({ ...workOrder, status, assignee: String(data.get("assignee")), priority: String(data.get("priority")), completionNotes: String(data.get("completionNotes")), requiresHousekeepingClearance: workOrder.requiresHousekeepingClearance }, released);
+  }}>
+    <div className="rounded-xl bg-slate-50 p-4"><p className="font-semibold text-slate-900">{workOrder.title}</p><p className="mt-1 text-sm text-slate-500">{workOrder.location} · {workOrder.category}</p>{workOrder.description && <p className="mt-2 text-sm leading-6 text-slate-700">{workOrder.description}</p>}</div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label>Status</Label><select aria-label="Work order status" name="status" defaultValue={workOrder.status} className={inputClass}><option>Open</option><option>Assigned</option><option>In Progress</option><option>Waiting</option><option>Completed</option><option>Cancelled</option></select></label><label><Label>Assigned technician</Label><select name="assignee" defaultValue={workOrder.assignee} className={inputClass}><option>Unassigned</option><option>Jordan Lee</option><option>Sam Rivera</option></select></label></div>
+    <label><Label>Priority</Label><select name="priority" defaultValue={workOrder.priority} className={inputClass}><option>Standard</option><option>High</option><option>Urgent</option></select></label>
+    <label><Label>Completion or progress notes</Label><textarea name="completionNotes" rows={3} defaultValue={workOrder.completionNotes} className={textareaClass} placeholder="Record the repair completed, testing performed, parts used, or reason work is waiting."/></label>
+    {workOrder.requiresHousekeepingClearance && roomNumber && <label className="flex min-h-11 items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><input name="releasedToHousekeeping" type="checkbox" className="mt-0.5 size-4 rounded border-emerald-300 text-emerald-700"/><span><strong className="block">Release Room {roomNumber} to Housekeeping</strong><span className="mt-0.5 block text-xs leading-5 text-emerald-800">Use this only when the work is completed and the room is safe for Housekeeping to enter.</span></span></label>}
   </EditorFrame>;
 }
 

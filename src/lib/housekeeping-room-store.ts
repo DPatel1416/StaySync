@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { sendDepartmentReminder } from "./notification-store";
 import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
-export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready to inspect" | "Inspected" | "Waiting";
+export type HousekeepingRoomStatus = "Assigned" | "In Progress" | "Ready to inspect" | "Inspected" | "Waiting" | "Ready to assign";
 
 export type HousekeepingRoomAssignment = {
   room: string;
@@ -17,7 +17,7 @@ export type HousekeepingRoomAssignment = {
 const seedAssignments: HousekeepingRoomAssignment[] = [
   { room: "307", service: "Stayover service", priority: "Priority", assignedTo: "Priya Shah", status: "Assigned" },
   { room: "308", service: "Departure clean", priority: "Standard", assignedTo: "Priya Shah", status: "In Progress" },
-  { room: "412", service: "Departure clean", priority: "Standard", assignedTo: "Unassigned", status: "Waiting" },
+  { room: "604", service: "Departure clean", priority: "Standard", assignedTo: "Unassigned", status: "Waiting" },
   { room: "518", service: "Departure clean", priority: "Priority", assignedTo: "Elena Ruiz", status: "In Progress" },
   { room: "621", service: "Refresh service", priority: "Standard", assignedTo: "Marcus Green", status: "Ready to inspect" },
 ];
@@ -79,6 +79,18 @@ export function assignHousekeepingRooms(roomNumbers: string[], assignedTo: strin
     const next: HousekeepingRoomAssignment = { room, service, priority, assignedTo, status: "Assigned" };
     assignments = existing ? assignments.map((assignment) => assignment.room === room ? next : assignment) : [...assignments, next];
   }
+  assignments.sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true }));
+  persist();
+  notify();
+}
+
+export function releaseRoomToHousekeeping(room: string) {
+  hydrate();
+  const existing = assignments.find((assignment) => assignment.room === room);
+  const released: HousekeepingRoomAssignment = existing
+    ? { ...existing, assignedTo: "Unassigned", status: "Ready to assign" }
+    : { room, service: "Departure clean", priority: "Standard", assignedTo: "Unassigned", status: "Ready to assign" };
+  assignments = existing ? assignments.map((assignment) => assignment.room === room ? released : assignment) : [...assignments, released];
   assignments.sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true }));
   persist();
   notify();

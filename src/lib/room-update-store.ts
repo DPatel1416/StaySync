@@ -44,6 +44,19 @@ export function updateRoomUpdateState(id: string | undefined, fallbackKey: strin
   listeners.forEach((listener) => listener());
 }
 
+export function markRoomClearedByMaintenance(room: string, actor: string) {
+  hydrate();
+  let matched = false;
+  updates = updates.map((update) => {
+    if (update.room !== room || update.type !== "Out of service") return update;
+    matched = true;
+    return { ...update, detail: `Maintenance cleared room ${room}. Housekeeping may assign the room for cleaning.`, time: "Just now", state: "Ready to assign", createdBy: actor };
+  });
+  if (!matched) updates = [{ id: `clearance-${room}-${Date.now()}`, room, type: "Maintenance clearance", detail: `Maintenance cleared room ${room}. Housekeeping may assign the room for cleaning.`, time: "Just now", state: "Ready to assign", createdBy: actor }, ...updates];
+  persist();
+  listeners.forEach((listener) => listener());
+}
+
 export function isInformationalRoomChange(update: Pick<RoomUpdate, "type">) {
   const type = update.type.toLowerCase();
   return type.includes("late checkout") || type.includes("early checkout") || type.includes("stayover") || type.includes("extended stay") || type.includes("extension");

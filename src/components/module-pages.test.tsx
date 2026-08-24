@@ -8,6 +8,7 @@ import { addServiceRequest, deleteServiceRequest, updateServiceRequest } from "@
 import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
 import { isRoomUpdateVisible } from "@/lib/room-update-store";
 import { serviceRequests as demoServiceRequests } from "@/lib/demo-data";
+import { updateWorkOrder } from "@/lib/work-order-store";
 
 vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -55,6 +56,51 @@ describe("Service Request reminders", () => {
     expect(screen.getByRole("heading", { name: "Department notifications" })).toBeInTheDocument();
     expect(screen.getAllByText("Reminder: SR-1047").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /Reminder: SR-1047/ }).some((link) => link.getAttribute("href") === "/app/maintenance/service-requests?request=SR-1047")).toBe(true);
+  });
+});
+
+describe("Maintenance workflows", () => {
+  it("shows Maintenance only requests assigned to Maintenance", () => {
+    render(<ModulePage role="maintenance" module="service-requests"/>);
+    expect(screen.getByText("SR-1047")).toBeInTheDocument();
+    expect(screen.getByText("SR-1046")).toBeInTheDocument();
+    expect(screen.queryByText("SR-1045")).not.toBeInTheDocument();
+    expect(screen.queryByText("SR-1049")).not.toBeInTheDocument();
+    expect(screen.getByText(/Requests sent to Maintenance by other departments/)).toBeInTheDocument();
+  });
+
+  it("uses a Maintenance-specific work order form", () => {
+    render(<ModulePage role="maintenance" module="work-orders" create/>);
+    expect(screen.getByRole("heading", { name: "Create work order" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Problem and required work/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Category/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Housekeeping is waiting for room clearance/)).toBeInTheDocument();
+    expect(screen.getByText(/Maintenance’s internal job record/)).toBeInTheDocument();
+  });
+
+  it("notifies Housekeeping when Maintenance completes and releases a room", () => {
+    const before = getDepartmentNotifications().filter((notification) => notification.kind === "ROOM_CLEARANCE").length;
+    const maintenance = render(<ModulePage role="maintenance" module="work-orders" requestId="WO-284"/>);
+    fireEvent.change(screen.getByLabelText("Work order status"), { target: { value: "Completed" } });
+    fireEvent.click(screen.getByLabelText(/^Release Room 604 to Housekeeping/));
+    fireEvent.change(screen.getByLabelText("Completion or progress notes"), { target: { value: "AC repaired and room safety check completed." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Room 604 released");
+    const clearances = getDepartmentNotifications().filter((notification) => notification.kind === "ROOM_CLEARANCE");
+    expect(clearances).toHaveLength(before + 1);
+    expect(clearances[0]).toEqual(expect.objectContaining({ department: "Housekeeping", audience: "SUPERVISORS", href: "/app/housekeeping/assigned-rooms", title: "Room 604 cleared by Maintenance" }));
+    maintenance.unmount();
+    saveDemoEmployeeSession("sofia.martin");
+    render(<ModulePage role="housekeeping" module="assigned-rooms"/>);
+    expect(screen.getByText("Ready to assign")).toBeInTheDocument();
+    const roomAssignee = screen.getByLabelText("Assigned employee for room 604");
+    fireEvent.change(roomAssignee, { target: { value: "Priya Shah" } });
+    const assignedRoom604 = screen.getByText("604").closest("article");
+    expect(assignedRoom604).not.toBeNull();
+    expect(within(assignedRoom604!).getByText("Assigned")).toBeInTheDocument();
+    act(() => updateWorkOrder({ id: "WO-284", title: "AC not cooling", location: "Room 604", category: "HVAC", priority: "Urgent", status: "In Progress", assignee: "Jordan Lee", age: "52 min", requiresHousekeepingClearance: true }));
+    act(() => updateHousekeepingRoom("604", { assignedTo: "Unassigned", status: "Waiting" }));
+    clearDemoEmployeeSession();
   });
 });
 
