@@ -133,6 +133,24 @@ describe("Maintenance workflows", () => {
     clearDemoEmployeeSession();
   });
 
+  it("keeps completed work visible to its technician and the supervisor", () => {
+    act(() => updateWorkOrder({ id: "WO-284", title: "AC not cooling", location: "Room 604", category: "HVAC", priority: "Urgent", status: "Completed", assignee: "Jordan Lee", age: "52 min", requiresHousekeepingClearance: true }));
+    saveDemoEmployeeSession("jordan.lee");
+    const technician = render(<ModulePage role="maintenance" module="work-orders"/>);
+    expect(screen.getByRole("heading", { name: "Completed work orders" })).toBeInTheDocument();
+    expect(screen.getByText("WO-284")).toBeInTheDocument();
+    expect(screen.queryByText("WO-283")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Service Request vs. Work Order/)).not.toBeInTheDocument();
+    technician.unmount();
+
+    saveDemoEmployeeSession("sam.rivera");
+    render(<ModulePage role="maintenance" module="work-orders"/>);
+    expect(screen.getByText("WO-284")).toBeInTheDocument();
+    expect(screen.getByText("WO-283")).toBeInTheDocument();
+    act(() => updateWorkOrder({ id: "WO-284", title: "AC not cooling", location: "Room 604", category: "HVAC", priority: "Urgent", status: "In Progress", assignee: "Jordan Lee", age: "52 min", requiresHousekeepingClearance: true }));
+    clearDemoEmployeeSession();
+  });
+
   it("schedules preventive maintenance for rooms or hotel areas with a custom category", () => {
     saveDemoEmployeeSession("sam.rivera");
     const supervisor = render(<ModulePage role="maintenance" module="preventive"/>);
@@ -163,6 +181,11 @@ describe("Maintenance workflows", () => {
     Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl });
     render(<ModulePage role="maintenance" module="maintenance-reports"/>);
     expect(screen.getByRole("heading", { name: "Repeat room issues" })).toBeInTheDocument();
+    expect(screen.getByText("Room 604")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Maintenance report type"), { target: { value: "Preventive Maintenance" } });
+    expect(screen.queryByText("Room 604")).not.toBeInTheDocument();
+    expect(screen.getByText(/No guest-room issues match preventive maintenance/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Maintenance report type"), { target: { value: "Service Requests" } });
     expect(screen.getByText("Room 604")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
     fireEvent.click(screen.getByRole("button", { name: "Export Excel" }));

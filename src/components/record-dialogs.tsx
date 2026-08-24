@@ -67,10 +67,17 @@ export function HousekeepingRoomIssueDialog({ onCreate }: { onCreate: (draft: Ho
 
 export type HousekeepingSosDraft = { location: string; note: string };
 export function HousekeepingSosDialog({ locations, onSend }: { locations: string[]; onSend: (draft: HousekeepingSosDraft) => void }) {
+  return <SupervisorAssistanceDialog department="Housekeeping" locations={locations} urgent onSend={onSend}/>;
+}
+
+export type SupervisorAssistanceDraft = { location: string; note: string };
+export function SupervisorAssistanceDialog({ department, locations, urgent = false, onSend }: { department: "Housekeeping" | "Maintenance"; locations: string[]; urgent?: boolean; onSend: (draft: SupervisorAssistanceDraft) => void }) {
   const suggestions = [...new Set(locations)];
-  return <DialogFrame title="Emergency SOS" description="Tell your Housekeeping supervisor where you are so they can come directly to you." triggerLabel="Emergency SOS" submitLabel="Send SOS" icon={BellRing} onSubmit={(data) => onSend({ location: String(data.get("location")), note: String(data.get("note")) })}>
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-950">This sends a direct emergency alert to your supervisor. It does not create a service request or assign work to another attendant.</div>
-    <label className="block"><Label required>Current room or location</Label><input name="location" required list="housekeeping-sos-locations" className={inputClass} placeholder="Room 307, third-floor hall, or linen room" autoComplete="off"/><datalist id="housekeeping-sos-locations">{suggestions.map((location) => <option key={location} value={location}/>)}</datalist><span className="mt-1.5 block text-xs text-slate-500">Choose an assigned room or enter your exact current location.</span></label>
+  const action = urgent ? "Emergency SOS" : "Request Support";
+  const listId = `${department.toLowerCase()}-${urgent ? "sos" : "support"}-locations`;
+  return <DialogFrame title={action} description={`Tell your ${department} supervisor where you are so they can come directly to you.`} triggerLabel={action} submitLabel={urgent ? "Send SOS" : "Notify supervisor"} icon={BellRing} onSubmit={(data) => onSend({ location: String(data.get("location")), note: String(data.get("note")) })}>
+    <div className={`rounded-xl border p-3 text-sm leading-5 ${urgent ? "border-amber-200 bg-amber-50 text-amber-950" : "border-sky-200 bg-sky-50 text-sky-950"}`}>This sends a direct {urgent ? "emergency alert" : "assistance notification"} to your supervisor. It does not create a service request or work order.</div>
+    <label className="block"><Label required>Current room or location</Label><input name="location" required list={listId} className={inputClass} placeholder={department === "Maintenance" ? "Room 604, pool area, or mechanical room" : "Room 307, third-floor hall, or linen room"} autoComplete="off"/><datalist id={listId}>{suggestions.map((location) => <option key={location} value={location}/>)}</datalist><span className="mt-1.5 block text-xs text-slate-500">Choose an assigned location or enter exactly where you are now.</span></label>
     <label className="block"><Label>What help do you need?</Label><textarea name="note" rows={2} className={textareaClass} placeholder="Optional short detail for your supervisor."/></label>
   </DialogFrame>;
 }

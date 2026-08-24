@@ -108,6 +108,47 @@ describe("dynamic room-change summaries", () => {
     expect(screen.queryByText(/VIP group arriving at 3:00 PM/)).not.toBeInTheDocument();
   });
 
+  it("sends Maintenance SOS and support notifications directly to the supervisor without creating records", () => {
+    saveDemoEmployeeSession("jordan.lee");
+    const beforeRequests = window.localStorage.getItem("staysync-service-requests");
+    const technician = render(<MaintenanceDashboard/>);
+    expect(screen.queryByText("Report Completion")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Emergency SOS" }));
+    fireEvent.change(screen.getByLabelText(/^Current room or location/), { target: { value: "Room 604" } });
+    fireEvent.change(screen.getByLabelText(/^What help do you need/), { target: { value: "Need help isolating electrical power." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send SOS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Emergency SOS sent from Room 604");
+
+    fireEvent.click(screen.getByRole("button", { name: "Request Support" }));
+    fireEvent.change(screen.getByLabelText(/^Current room or location/), { target: { value: "Pool mechanical room" } });
+    fireEvent.change(screen.getByLabelText(/^What help do you need/), { target: { value: "Please assist with the pump inspection." } });
+    fireEvent.click(screen.getByRole("button", { name: "Notify supervisor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Support request sent from Pool mechanical room");
+    expect(window.localStorage.getItem("staysync-service-requests")).toBe(beforeRequests);
+    technician.unmount();
+
+    saveDemoEmployeeSession("sam.rivera");
+    render(<MaintenanceDashboard/>);
+    expect(screen.getByText("Jordan Lee needs emergency help")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Lee requested support")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge SOS from Jordan Lee" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge support request from Jordan Lee" }));
+    expect(screen.queryByText("Jordan Lee needs emergency help")).not.toBeInTheDocument();
+    expect(screen.queryByText("Jordan Lee requested support")).not.toBeInTheDocument();
+  });
+
+  it("shows a technician only their personal work summary", () => {
+    saveDemoEmployeeSession("jordan.lee");
+    render(<MaintenanceDashboard/>);
+    expect(screen.getByRole("heading", { name: "My work summary" })).toBeInTheDocument();
+    expect(screen.getByText("Only work assigned to you")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Department workload" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Recurring room issues")).not.toBeInTheDocument();
+  });
+
   it("limits Front Desk attention items to work assigned to Front Desk", () => {
     render(<FrontDeskDashboard/>);
     expect(screen.getByText("Live work currently assigned to Front Desk")).toBeInTheDocument();
