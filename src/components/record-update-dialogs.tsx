@@ -51,11 +51,16 @@ export function WorkOrderEditor({ workOrder, canAssign = true, onClose, onSave }
 }
 
 export type EditableLog = { id: string; author: string; department: string; sharedWith?: string[]; time: string; message: string; priority: string; pinned: boolean; createdAt?: number };
-export function OperationLogEditor({ log, onClose, onSave, onDelete }: { log: EditableLog | null; onClose: () => void; onSave: (log: EditableLog) => void; onDelete?: (log: EditableLog) => void }) {
+const operationLogModificationWindow = 15 * 60 * 1000;
+export function canModifyOperationLog(log: EditableLog, currentUserName: string, now = Date.now()) {
+  if (log.author !== currentUserName || !log.createdAt) return false;
+  const age = now - log.createdAt;
+  return age >= 0 && age <= operationLogModificationWindow;
+}
+export function OperationLogEditor({ log, currentUserName = "Alex Morgan", onClose, onSave, onDelete }: { log: EditableLog | null; currentUserName?: string; onClose: () => void; onSave: (log: EditableLog) => void; onDelete?: (log: EditableLog) => void }) {
   if (!log) return null;
-  const canEdit = log.author === "Alex Morgan" || log.author === "You";
-  const canDelete = canEdit && Boolean(log.createdAt && Date.now() - log.createdAt <= 10 * 60 * 1000);
-  return <EditorFrame open title="Edit Operations Log entry" description="You can edit entries you authored. Deletion is available for 10 minutes after posting." canEdit={canEdit} canDelete={canDelete} onDelete={() => onDelete?.(log)} onClose={onClose} onSubmit={(data) => onSave({ ...log, message: String(data.get("message")), sharedWith: String(data.get("sharedWith")) ? [String(data.get("sharedWith"))] : [], priority: String(data.get("priority")), pinned: data.get("pinned") === "on" })}>
+  const canEdit = canModifyOperationLog(log, currentUserName);
+  return <EditorFrame open title="Edit Operations Log entry" description="You can edit or delete your entry for 15 minutes after posting. After that, the original entry is locked." canEdit={canEdit} canDelete={canEdit} onDelete={() => onDelete?.(log)} onClose={onClose} onSubmit={(data) => onSave({ ...log, message: String(data.get("message")), sharedWith: String(data.get("sharedWith")) ? [String(data.get("sharedWith"))] : [], priority: String(data.get("priority")), pinned: data.get("pinned") === "on" })}>
     <label><Label>Update</Label><textarea name="message" required rows={4} defaultValue={log.message} disabled={!canEdit} className={textareaClass}/></label>
     <div className="grid gap-4 sm:grid-cols-2"><label><Label>Share with another department</Label><select name="sharedWith" defaultValue={log.sharedWith?.[0] ?? ""} disabled={!canEdit} className={inputClass}><option value="">Department only</option><option>Front Desk</option><option>Maintenance</option><option>Housekeeping</option><option>Kitchen</option><option>Management</option></select></label><label><Label>Priority</Label><select name="priority" defaultValue={log.priority} disabled={!canEdit} className={inputClass}><option>Standard</option><option>Important</option><option>Urgent</option></select></label></div>
     <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="pinned" type="checkbox" defaultChecked={log.pinned} disabled={!canEdit} className="size-4 rounded border-slate-300 text-brand"/>Pin this entry</label>

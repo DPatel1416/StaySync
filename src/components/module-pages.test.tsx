@@ -217,6 +217,7 @@ describe("Operations Log conversations", () => {
     expect(screen.getByText(/VIP group arriving at 3:00 PM/)).toBeInTheDocument();
     expect(screen.getByText(/Room 604 remains out of service/)).toBeInTheDocument();
     expect(screen.queryByText(/East elevator returned to service/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Viewing")).not.toBeInTheDocument();
   });
 
   it("adds an inline reply to a log entry", () => {
@@ -229,12 +230,34 @@ describe("Operations Log conversations", () => {
   });
 
   it("attaches a file and shows its metadata on the entry", () => {
-    render(<ModulePage role="front-desk" module="operations-log"/>);
-    const input = screen.getAllByLabelText("Attachment")[0];
+    render(<ModulePage role="front-desk" module="operations-log" create/>);
+    fireEvent.change(screen.getByLabelText(/^Update/), { target: { value: "Fresh Front Desk handoff" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish update" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const freshLog = screen.getByText("Fresh Front Desk handoff").closest("article");
+    expect(freshLog).not.toBeNull();
+    const input = within(freshLog!).getByLabelText("Attachment");
     const file = new File(["handoff"], "vip-handoff.pdf", { type: "application/pdf" });
     fireEvent.change(input, { target: { files: [file] } });
     expect(screen.getByText("vip-handoff.pdf")).toBeInTheDocument();
-    expect(screen.getByText(/Added by You/)).toBeInTheDocument();
+    expect(screen.getByText(/Added by Alex Morgan/)).toBeInTheDocument();
+  });
+
+  it("allows users to reply but only lets the log author edit the original entry", () => {
+    saveDemoEmployeeSession("jordan.lee");
+    render(<ModulePage role="maintenance" module="operations-log" create/>);
+    fireEvent.change(screen.getByLabelText(/^Update/), { target: { value: "Pump inspection started" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish update" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const ownLog = screen.getByText("Pump inspection started").closest("article");
+    const sharedLog = screen.getByText(/Room 604 remains out of service/).closest("article");
+    expect(ownLog).not.toBeNull();
+    expect(sharedLog).not.toBeNull();
+    expect(within(ownLog!).getByRole("button", { name: "Edit entry" })).toBeInTheDocument();
+    expect(within(sharedLog!).queryByRole("button", { name: "Edit entry" })).not.toBeInTheDocument();
+    expect(within(sharedLog!).getByRole("button", { name: "Reply" })).toBeInTheDocument();
+    expect(within(sharedLog!).queryByLabelText("Attachment")).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
   });
 
   it("allows Management to review internal logs from every department", () => {
