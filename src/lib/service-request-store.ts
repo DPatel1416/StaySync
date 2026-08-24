@@ -28,7 +28,7 @@ let hydrated = false;
 function notify() { listeners.forEach((listener) => listener()); }
 
 function removeLegacySosRequests(value: ServiceRequest[]) {
-  return value.filter((request) => !request.id.startsWith("SOS-"));
+  return value.filter((request) => !request.id.startsWith("SOS-")).map((request) => request.assigned === "Maintenance" && !request.assignedUser ? { ...request, assignedUser: request.id === "SR-1047" ? "Jordan Lee" : "Unassigned" } : request);
 }
 
 function hydrate() {
@@ -39,7 +39,7 @@ function hydrate() {
     if (stored) {
       const storedRequests = JSON.parse(stored) as ServiceRequest[];
       requests = removeLegacySosRequests(storedRequests);
-      if (requests.length !== storedRequests.length) persist();
+      if (JSON.stringify(requests) !== JSON.stringify(storedRequests)) persist();
     }
   } catch {
     requests = [...seed];
@@ -48,7 +48,7 @@ function hydrate() {
     try {
       const incoming = value ? JSON.parse(value) as ServiceRequest[] : [...seed];
       requests = removeLegacySosRequests(incoming);
-      if (requests.length !== incoming.length) persist();
+      if (JSON.stringify(requests) !== JSON.stringify(incoming)) persist();
     } catch { requests = [...seed]; }
     notify();
   });

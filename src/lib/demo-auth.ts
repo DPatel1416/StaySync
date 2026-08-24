@@ -7,7 +7,9 @@ export const demoEmployees: Record<string, DemoEmployee> = {
   "sofia.martin": { password: "staysync-demo", workspace: "housekeeping", name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
   "priya.shah": { password: "staysync-demo", workspace: "housekeeping", name: "Priya Shah", title: "Room Attendant" },
   "elena.ruiz": { password: "staysync-demo", workspace: "housekeeping", name: "Elena Ruiz", title: "Room Attendant" },
+  "sam.rivera": { password: "staysync-demo", workspace: "maintenance", name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
   "jordan.lee": { password: "staysync-demo", workspace: "maintenance", name: "Jordan Lee", title: "Maintenance Technician" },
+  "noah.wilson": { password: "staysync-demo", workspace: "maintenance", name: "Noah Wilson", title: "Maintenance Technician" },
   "maya.chen": { password: "staysync-demo", workspace: "manager", name: "Maya Chen", title: "Operations Manager", isSupervisor: true },
 };
 

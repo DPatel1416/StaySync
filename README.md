@@ -13,7 +13,8 @@ StaySync is a hotel communication and operations platform for service requests, 
    - Housekeeping Supervisor: `sofia.martin` / `staysync-demo`
    - Housekeeping Attendant: `priya.shah` / `staysync-demo`
    - Housekeeping Attendant: `elena.ruiz` / `staysync-demo`
-   - Maintenance: `jordan.lee` / `staysync-demo`
+   - Maintenance supervisor: `sam.rivera` / `staysync-demo`
+   - Maintenance technician: `jordan.lee` / `staysync-demo`
    - Manager: `maya.chen` / `staysync-demo`
    - Account Holder: `owner@northstar.demo` / `staysync-demo`
 

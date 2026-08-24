@@ -21,12 +21,15 @@ export type WorkOrder = {
   completionNotes?: string;
   createdAt?: number;
   createdBy?: string;
+  type?: "Corrective" | "Preventive";
+  frequency?: string;
 };
 
 const seed: WorkOrder[] = seedWorkOrders.map((order) => ({
   ...order,
   category: order.title.includes("AC") ? "HVAC" : order.title.includes("fixture") ? "Plumbing" : "Equipment",
   requiresHousekeepingClearance: order.location.startsWith("Room "),
+  type: order.id === "WO-279" ? "Preventive" : "Corrective",
 })) as WorkOrder[];
 let workOrders: WorkOrder[] = [...seed];
 const listeners = new Set<() => void>();
@@ -35,16 +38,21 @@ let hydrated = false;
 
 function notify() { listeners.forEach((listener) => listener()); }
 function persist() { publishBrowserState(storageKey, JSON.stringify(workOrders)); }
+function normalizeWorkOrders(value: WorkOrder[]) { return value.map((order) => ({ ...order, category: order.category ?? (order.title.includes("AC") ? "HVAC" : "Equipment"), type: order.type ?? (order.id === "WO-279" ? "Preventive" : "Corrective"), assignee: order.id === "WO-283" && order.assignee === "Sam Rivera" ? "Noah Wilson" : order.assignee })); }
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
   try {
     const stored = window.localStorage.getItem(storageKey);
-    if (stored) workOrders = JSON.parse(stored) as WorkOrder[];
+    if (stored) {
+      const storedOrders = JSON.parse(stored) as WorkOrder[];
+      workOrders = normalizeWorkOrders(storedOrders);
+      if (JSON.stringify(workOrders) !== JSON.stringify(storedOrders)) persist();
+    }
   } catch { workOrders = [...seed]; }
   subscribeBrowserState(storageKey, (value) => {
-    try { workOrders = value ? JSON.parse(value) as WorkOrder[] : [...seed]; } catch { workOrders = [...seed]; }
+    try { workOrders = value ? normalizeWorkOrders(JSON.parse(value) as WorkOrder[]) : [...seed]; } catch { workOrders = [...seed]; }
     notify();
   });
 }
@@ -70,3 +78,5 @@ export function useWorkOrders() {
     () => seed,
   );
 }
+
+export const maintenanceEmployees = ["Unassigned", "Jordan Lee", "Noah Wilson", "Sam Rivera"];

@@ -30,4 +30,14 @@ describe("property selector", () => {
     expect(screen.getAllByRole("link", { name: "Assigned Rooms" }).length).toBeGreaterThan(0);
     clearDemoEmployeeSession();
   });
+
+  it("keeps annual Maintenance reports in the supervisor workspace", () => {
+    saveDemoEmployeeSession("jordan.lee");
+    const technician = render(<AppShell role="maintenance"><div>Technician dashboard</div></AppShell>);
+    expect(screen.queryByRole("link", { name: "Maintenance Reports" })).not.toBeInTheDocument();
+    technician.unmount();
+    clearDemoEmployeeSession();
+    render(<AppShell role="maintenance"><div>Supervisor dashboard</div></AppShell>);
+    expect(screen.getAllByRole("link", { name: "Maintenance Reports" }).length).toBeGreaterThan(0);
+  });
 });

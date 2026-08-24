@@ -76,6 +76,8 @@ describe("Maintenance workflows", () => {
     expect(screen.getByLabelText(/^Category/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Housekeeping is waiting for room clearance/)).toBeInTheDocument();
     expect(screen.getByText(/Maintenance’s internal job record/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^Category/), { target: { value: "Other" } });
+    expect(screen.getByLabelText(/^Custom category/)).toBeInTheDocument();
   });
 
   it("notifies Housekeeping when Maintenance completes and releases a room", () => {
@@ -101,6 +103,72 @@ describe("Maintenance workflows", () => {
     act(() => updateWorkOrder({ id: "WO-284", title: "AC not cooling", location: "Room 604", category: "HVAC", priority: "Urgent", status: "In Progress", assignee: "Jordan Lee", age: "52 min", requiresHousekeepingClearance: true }));
     act(() => updateHousekeepingRoom("604", { assignedTo: "Unassigned", status: "Waiting" }));
     clearDemoEmployeeSession();
+  });
+
+  it("routes incoming Maintenance requests through the supervisor before the technician", () => {
+    saveDemoEmployeeSession("sam.rivera");
+    const supervisor = render(<ModulePage role="maintenance" module="service-requests"/>);
+    fireEvent.click(screen.getByRole("button", { name: /Open SR-1046/ }));
+    expect(screen.getByLabelText("Status")).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Assigned Maintenance employee"), { target: { value: "Noah Wilson" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText(/SR-1046 assigned to Noah Wilson/)).toBeInTheDocument();
+    supervisor.unmount();
+
+    saveDemoEmployeeSession("noah.wilson");
+    render(<ModulePage role="maintenance" module="service-requests"/>);
+    expect(screen.getByText("SR-1046")).toBeInTheDocument();
+    expect(screen.queryByText("SR-1047")).not.toBeInTheDocument();
+    act(() => updateServiceRequest({ id: "SR-1046", title: "Meeting room temperature", location: "Maple Room", from: "Events", assigned: "Maintenance", assignedUser: "Unassigned", priority: "High", status: "Open", due: "11:00 AM" }));
+    clearDemoEmployeeSession();
+  });
+
+  it("shows technicians only their assigned work orders", () => {
+    saveDemoEmployeeSession("jordan.lee");
+    render(<ModulePage role="maintenance" module="work-orders"/>);
+    expect(screen.getByRole("heading", { name: "My Work Orders" })).toBeInTheDocument();
+    expect(screen.getByText("WO-284")).toBeInTheDocument();
+    expect(screen.queryByText("WO-283")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create work order" })).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
+  });
+
+  it("schedules preventive maintenance for rooms or hotel areas with a custom category", () => {
+    saveDemoEmployeeSession("sam.rivera");
+    const supervisor = render(<ModulePage role="maintenance" module="preventive"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Schedule maintenance" }));
+    fireEvent.change(screen.getByLabelText(/^Maintenance task/), { target: { value: "Inspect balcony door hardware" } });
+    fireEvent.change(screen.getByLabelText(/^Inspection or service checklist/), { target: { value: "Inspect lock, hinges, seal, and closing alignment." } });
+    fireEvent.change(screen.getByLabelText(/^Room number/), { target: { value: "812" } });
+    fireEvent.change(screen.getByLabelText(/^Category/), { target: { value: "Other" } });
+    fireEvent.change(screen.getByLabelText(/^Custom category/), { target: { value: "Doors and hardware" } });
+    fireEvent.change(screen.getByLabelText(/^Next due date/), { target: { value: "2026-12-01" } });
+    fireEvent.change(screen.getByLabelText(/^Assigned technician/), { target: { value: "Jordan Lee" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add schedule" }));
+    supervisor.unmount();
+
+    saveDemoEmployeeSession("jordan.lee");
+    render(<ModulePage role="maintenance" module="preventive"/>);
+    expect(screen.getByText("Inspect balcony door hardware")).toBeInTheDocument();
+    expect(screen.getByText(/Room 812 · Doors and hardware/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Schedule maintenance" })).not.toBeInTheDocument();
+    clearDemoEmployeeSession();
+  });
+
+  it("provides annual exports and ranks repeat guest-room issues", () => {
+    const createObjectUrl = vi.fn(() => "blob:maintenance-report");
+    const revokeObjectUrl = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl });
+    render(<ModulePage role="maintenance" module="maintenance-reports"/>);
+    expect(screen.getByRole("heading", { name: "Repeat room issues" })).toBeInTheDocument();
+    expect(screen.getByText("Room 604")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export Excel" }));
+    expect(createObjectUrl).toHaveBeenCalledTimes(2);
+    expect(revokeObjectUrl).toHaveBeenCalledTimes(2);
+    anchorClick.mockRestore();
   });
 });
 

@@ -10,14 +10,14 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
 import { ListRows, PageHeading } from "./dashboard/shared";
-import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, OperationLogDialog, ServiceRequestDialog, WorkOrderDialog, type WorkOrderDraft } from "./record-dialogs";
+import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, OperationLogDialog, PreventiveMaintenanceDialog, ServiceRequestDialog, WorkOrderDialog, type PreventiveMaintenanceDraft, type WorkOrderDraft } from "./record-dialogs";
 import { IncidentEditor, LostFoundEditor, OperationLogEditor, ServiceRequestEditor, WorkOrderEditor, type EditableLog, type EditableOperationalRecord, type EditableRequest } from "./record-update-dialogs";
 import { addRoomUpdate, isInformationalRoomChange, markRoomClearedByMaintenance, updateRoomUpdateState, useRoomUpdates } from "@/lib/room-update-store";
 import { addServiceRequest, deleteServiceRequest, updateServiceRequest, useServiceRequests } from "@/lib/service-request-store";
 import { sendDepartmentReminder } from "@/lib/notification-store";
 import { assignHousekeepingRooms, housekeepingEmployees, parseRoomNumbers, releaseRoomToHousekeeping, updateHousekeepingRoom, useHousekeepingRooms, type HousekeepingRoomAssignment } from "@/lib/housekeeping-room-store";
 import { demoEmployees, getDemoEmployeeSession, type DemoEmployee } from "@/lib/demo-auth";
-import { addWorkOrder, updateWorkOrder, useWorkOrders, type WorkOrder } from "@/lib/work-order-store";
+import { addWorkOrder, maintenanceEmployees, updateWorkOrder, useWorkOrders, type WorkOrder } from "@/lib/work-order-store";
 
 const moduleTitles: Record<string, [string, string]> = {
   incidents: ["Incidents", "Document, review, and resolve operational incidents."],
@@ -38,6 +38,8 @@ export function ModulePage({ role, module, create = false, requestId }: { role: 
   if (module === "room-updates") return <RoomStatus role={role} autoOpen={create}/>;
   if (module === "assigned-rooms" && role === "housekeeping") return <AssignedRooms/>;
   if (module === "work-orders") return <WorkOrders autoOpen={create} initialWorkOrderId={requestId}/>;
+  if (module === "preventive") return <PreventiveMaintenance/>;
+  if (module === "maintenance-reports") return <MaintenanceReports/>;
   if (module === "quality-scores") return <QualityScores/>;
   if (module === "reports") return <Reports/>;
   if (module === "settings") return <AccountSettings role={role}/>;
@@ -74,10 +76,12 @@ function OperationsLog({ role, autoOpen = false }: { role: WorkspaceRole; autoOp
 
 function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: WorkspaceRole; autoOpen?: boolean; initialRequestId?: string }) {
   const requests = useServiceRequests();
-  const [currentEmployee, setCurrentEmployee] = useState(role === "housekeeping" ? demoEmployees["sofia.martin"] : null);
-  useEffect(() => { if (role === "housekeeping") setCurrentEmployee(getDemoEmployeeSession(role) ?? demoEmployees["sofia.martin"]); }, [role]);
+  const defaultDepartmentEmployee = role === "housekeeping" ? demoEmployees["sofia.martin"] : role === "maintenance" ? demoEmployees["sam.rivera"] : null;
+  const [currentEmployee, setCurrentEmployee] = useState(defaultDepartmentEmployee);
+  useEffect(() => { if (role === "housekeeping" || role === "maintenance") setCurrentEmployee(getDemoEmployeeSession(role) ?? (role === "housekeeping" ? demoEmployees["sofia.martin"] : demoEmployees["sam.rivera"])); }, [role]);
   const isHousekeepingSupervisor = role === "housekeeping" && Boolean(currentEmployee?.isSupervisor);
-  const visibleRequests = role === "maintenance" ? requests.filter((request) => request.assigned === "Maintenance") : role !== "housekeeping" ? requests : requests.filter((request) => request.assigned === "Housekeeping" && (isHousekeepingSupervisor || request.assignedUser === currentEmployee?.name));
+  const isMaintenanceSupervisor = role === "maintenance" && Boolean(currentEmployee?.isSupervisor);
+  const visibleRequests = role === "maintenance" ? requests.filter((request) => request.assigned === "Maintenance" && (isMaintenanceSupervisor || request.assignedUser === currentEmployee?.name)) : role !== "housekeeping" ? requests : requests.filter((request) => request.assigned === "Housekeeping" && (isHousekeepingSupervisor || request.assignedUser === currentEmployee?.name));
   const [selectedRequest, setSelectedRequest] = useState<EditableRequest | null>(() => visibleRequests.find((request) => request.id === initialRequestId) ?? null);
   const [lastReminder, setLastReminder] = useState<{ requestId: string; department: string } | null>(null);
   const [lastSavedRequest, setLastSavedRequest] = useState<EditableRequest | null>(null);
@@ -90,9 +94,10 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
   const reportedIssues = isHousekeepingSupervisor ? activeRequests.filter((request) => request.from === "Housekeeping") : [];
   const primaryRequests = isHousekeepingSupervisor ? activeRequests.filter((request) => request.from !== "Housekeeping") : activeRequests;
   function createRequest(draft: { title: string; location: string; department: string; priority: string; due: string }) {
-    const request = { id: `SR-${1050 + requests.length}`, title: draft.title, location: draft.location, from: workspaceNames[role], assigned: draft.department, assignedUser: draft.department === "Housekeeping" ? "Unassigned" : undefined, priority: draft.priority, status: "Open", due: draft.due ? "Scheduled" : "Today", createdAt: Date.now(), createdBy: role === "front-desk" ? "Alex Morgan" : currentEmployee?.name ?? "You" };
+    const request = { id: `SR-${1050 + requests.length}`, title: draft.title, location: draft.location, from: workspaceNames[role], assigned: draft.department, assignedUser: draft.department === "Housekeeping" || draft.department === "Maintenance" ? "Unassigned" : undefined, priority: draft.priority, status: "Open", due: draft.due ? "Scheduled" : "Today", createdAt: Date.now(), createdBy: role === "front-desk" ? "Alex Morgan" : currentEmployee?.name ?? "You" };
     addServiceRequest(request);
     if (draft.department === "Housekeeping") sendDepartmentReminder({ department: "Housekeeping", title: `New service request: ${request.id}`, message: `${request.title} at ${request.location} is waiting for supervisor assignment.`, serviceRequestId: request.id, createdBy: request.createdBy, audience: "SUPERVISORS", tone: request.priority === "Urgent" ? "urgent" : "info", kind: "SERVICE_REQUEST" });
+    if (draft.department === "Maintenance") sendDepartmentReminder({ department: "Maintenance", title: `New service request: ${request.id}`, message: `${request.title} at ${request.location} is waiting for supervisor assignment.`, serviceRequestId: request.id, createdBy: request.createdBy, audience: "SUPERVISORS", tone: request.priority === "Urgent" ? "urgent" : "info", kind: "SERVICE_REQUEST" });
   }
   function remind(request: EditableRequest) {
     sendDepartmentReminder({
@@ -110,7 +115,7 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
     <PageHeading eyebrow={workspaceNames[role]} title="Service Requests" description={role === "maintenance" ? "Requests sent to Maintenance by other departments. Create or track internal repair jobs under Work Orders." : role === "housekeeping" ? isHousekeepingSupervisor ? "Review incoming department requests separately from issues reported by your team." : "Requests assigned specifically to you." : "Coordinate operational requests from creation through completion."} actions={canCreate ? <ServiceRequestDialog defaultOpen={autoOpen} onCreate={createRequest}/> : undefined}/>
     <Toolbar placeholder="Search requests, rooms, or locations…" action={<label className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600"><CalendarDays className="size-4"/><span className="sr-only">Request date</span><input aria-label="Request date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="bg-transparent text-sm outline-none"/></label>}/>
     <p className="sr-only" role="status" aria-live="polite">{lastReminder ? `Reminder sent to ${lastReminder.department} for ${lastReminder.requestId}.` : ""}</p>
-    {lastSavedRequest && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><Check className="size-4"/>{isHousekeepingSupervisor ? `${lastSavedRequest.id} assigned to ${lastSavedRequest.assignedUser ?? lastSavedRequest.assigned}. The request is now visible in their queue.` : `${lastSavedRequest.id} updated to ${lastSavedRequest.status}.`}</div>}
+    {lastSavedRequest && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><Check className="size-4"/>{isHousekeepingSupervisor || isMaintenanceSupervisor ? `${lastSavedRequest.id} assigned to ${lastSavedRequest.assignedUser ?? lastSavedRequest.assigned}. The request is now visible in their queue.` : `${lastSavedRequest.id} updated to ${lastSavedRequest.status}.`}</div>}
     {isHousekeepingSupervisor && <Card id="reported-room-issues" className="overflow-hidden"><CardHeader title="Employee-reported room issues" description="Room issues submitted by Housekeeping attendants for follow-up"/><div className="divide-y divide-slate-100">{reportedIssues.map((request) => <button key={request.id} onClick={() => setSelectedRequest(request)} className="flex min-h-[72px] w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 sm:px-6"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-sm font-bold text-amber-800">{request.location.replace("Room ", "")}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{request.title}</span><span className="mt-1 block text-xs text-slate-500">Reported by {request.createdBy ?? "Housekeeping employee"}</span></span><Badge tone={request.priority === "Urgent" ? "urgent" : "warning"}>{request.assignedUser === "Unassigned" ? "Needs assignment" : request.status}</Badge></button>)}{reportedIssues.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No employee-reported issues for this date.</p>}</div></Card>}
     <Card className="overflow-hidden"><CardHeader title={isHousekeepingSupervisor ? "Department service requests" : "Active service requests"} description={isHousekeepingSupervisor ? "Requests sent to Housekeeping by Front Desk and other departments" : `Open work for ${selectedDate}`}/>
       <div className="hidden grid-cols-[120px_1fr_150px_140px_130px_110px_48px] gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid"><span>Request</span><span>Details</span><span>Assigned to</span><span>Priority</span><span>Status</span><span>Due</span>{role === "front-desk" && <span className="text-center">Notify</span>}</div>
@@ -127,7 +132,7 @@ function ServiceRequests({ role, autoOpen = false, initialRequestId }: { role: W
     </Card>
     <Card className="overflow-hidden"><CardHeader title="Completed" description={`Completed and cancelled requests for ${selectedDate}`}/>{completedRequests.length ? <ListRows rows={completedRequests.map((request) => ({ title: `${request.id} · ${request.title}`, detail: `${request.location} · ${request.assignedUser ?? request.assigned}`, badge: request.status, tone: request.status === "Completed" ? "success" : "neutral", href: `/app/${role}/service-requests?request=${request.id}` }))}/> : <p className="px-5 py-8 text-center text-sm text-slate-500">No completed requests for this date.</p>}</Card>
     {lastReminder && <div role="alert" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"><Check className="size-4"/>Reminder sent to {lastReminder.department} for {lastReminder.requestId}.</div>}
-    <ServiceRequestEditor request={selectedRequest} currentDepartment={workspaceNames[role]} currentUserName={currentEmployee?.name} isDepartmentSupervisor={isHousekeepingSupervisor} assigneeOptions={housekeepingEmployees} onClose={() => setSelectedRequest(null)} onSave={(updated) => { updateServiceRequest(updated); setLastSavedRequest(updated); }} onDelete={(deleted) => deleteServiceRequest(deleted.id)}/>
+    <ServiceRequestEditor request={selectedRequest} currentDepartment={workspaceNames[role]} currentUserName={currentEmployee?.name} isDepartmentSupervisor={isHousekeepingSupervisor || isMaintenanceSupervisor} assigneeOptions={role === "maintenance" ? maintenanceEmployees : housekeepingEmployees} onClose={() => setSelectedRequest(null)} onSave={(updated) => { updateServiceRequest(updated); setLastSavedRequest(updated); }} onDelete={(deleted) => deleteServiceRequest(deleted.id)}/>
   </div>;
 }
 
@@ -173,20 +178,25 @@ function RoomCleaningControl({ assignment, supervisor }: { assignment: Housekeep
 }
 
 function WorkOrders({ autoOpen = false, initialWorkOrderId }: { autoOpen?: boolean; initialWorkOrderId?: string }) {
-  const workOrders = useWorkOrders();
-  const [selected, setSelected] = useState<WorkOrder | null>(() => workOrders.find((order) => order.id === initialWorkOrderId) ?? null);
+  const allWorkOrders = useWorkOrders();
+  const [employee, setEmployee] = useState<DemoEmployee>(demoEmployees["sam.rivera"]);
+  useEffect(() => setEmployee(getDemoEmployeeSession("maintenance") ?? demoEmployees["sam.rivera"]), []);
+  const isSupervisor = Boolean(employee.isSupervisor);
+  const workOrders = allWorkOrders.filter((order) => order.type !== "Preventive" && (isSupervisor || order.assignee === employee.name));
+  const [selected, setSelected] = useState<WorkOrder | null>(() => allWorkOrders.find((order) => order.id === initialWorkOrderId) ?? null);
+  useEffect(() => { if (!isSupervisor && selected?.assignee !== employee.name) setSelected(null); }, [employee.name, isSupervisor, selected]);
   const [message, setMessage] = useState("");
   function createWorkOrder(draft: WorkOrderDraft) {
-    addWorkOrder({ id: `WO-${285 + workOrders.length}`, ...draft, status: draft.assignee === "Unassigned" ? "Open" : "Assigned", createdAt: Date.now(), createdBy: "Jordan Lee", age: "Just now" });
+    addWorkOrder({ id: `WO-${285 + allWorkOrders.length}`, ...draft, type: "Corrective", status: draft.assignee === "Unassigned" ? "Open" : "Assigned", createdAt: Date.now(), createdBy: employee.name, age: "Just now" });
     setMessage("Work order created for Maintenance.");
   }
   function saveWorkOrder(updated: WorkOrder, releaseRequested: boolean) {
     updateWorkOrder(updated);
     const room = updated.location.match(/^Room\s+(\d+)/i)?.[1];
     if (releaseRequested && updated.status === "Completed" && room) {
-      markRoomClearedByMaintenance(room, "Jordan Lee");
+      markRoomClearedByMaintenance(room, employee.name);
       releaseRoomToHousekeeping(room);
-      sendDepartmentReminder({ department: "Housekeeping", title: `Room ${room} cleared by Maintenance`, message: `${updated.id} is complete. Room ${room} is safe to enter and ready for the supervisor to assign for cleaning.`, serviceRequestId: updated.id, href: "/app/housekeeping/assigned-rooms", createdBy: "Jordan Lee", audience: "SUPERVISORS", tone: "info", kind: "ROOM_CLEARANCE" });
+      sendDepartmentReminder({ department: "Housekeeping", title: `Room ${room} cleared by Maintenance`, message: `${updated.id} is complete. Room ${room} is safe to enter and ready for the supervisor to assign for cleaning.`, serviceRequestId: updated.id, href: "/app/housekeeping/assigned-rooms", createdBy: employee.name, audience: "SUPERVISORS", tone: "info", kind: "ROOM_CLEARANCE" });
       setMessage(`Room ${room} released. The Housekeeping supervisor has been notified.`);
     } else if (releaseRequested) {
       setMessage("Set the work order to Completed before releasing the room to Housekeeping.");
@@ -197,8 +207,55 @@ function WorkOrders({ autoOpen = false, initialWorkOrderId }: { autoOpen?: boole
   const active = workOrders.filter((order) => order.status !== "Completed" && order.status !== "Cancelled");
   const completed = workOrders.filter((order) => order.status === "Completed" || order.status === "Cancelled");
   const rows = (orders: WorkOrder[]) => orders.map((order) => <button type="button" key={order.id} onClick={() => setSelected(order)} className="grid w-full gap-3 px-5 py-5 text-left hover:bg-slate-50 sm:px-6 md:grid-cols-[120px_1fr_130px_140px] md:items-center"><span className="text-sm font-semibold text-brand">{order.id}</span><span><span className="block text-sm font-semibold text-slate-900">{order.title}</span><span className="mt-1 block text-xs text-slate-500">{order.location} · {order.assignee}</span></span><Badge tone={order.priority === "Urgent" ? "urgent" : order.priority === "High" ? "warning" : "neutral"}>{order.priority}</Badge><Badge tone={order.status === "Completed" ? "success" : order.status === "In Progress" ? "info" : order.status === "Waiting" ? "warning" : "brand"}>{order.status}</Badge></button>);
-  return <div className="space-y-6"><PageHeading eyebrow="Maintenance" title="Work Orders" description="Maintenance-owned repair, inspection, and preventive work records." actions={<WorkOrderDialog defaultOpen={autoOpen} onCreate={createWorkOrder}/>}/>{message && <p role="status" className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.startsWith("Set") ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{message}</p>}<div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Service Request vs. Work Order:</strong> a Service Request is sent to Maintenance by another department. A Work Order is the Maintenance team’s internal job record for performing and documenting the repair.</div><Toolbar placeholder="Search work orders…"/><Card className="overflow-hidden"><CardHeader title="Active work orders" description="Maintenance work that still requires action"/><div className="divide-y divide-slate-100">{rows(active)}{active.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No active Maintenance work orders.</p>}</div></Card><Card className="overflow-hidden"><CardHeader title="Completed work orders" description="Maintenance work completed or cancelled"/><div className="divide-y divide-slate-100">{rows(completed)}{completed.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No completed Maintenance work orders.</p>}</div></Card><WorkOrderEditor workOrder={selected} onClose={() => setSelected(null)} onSave={saveWorkOrder}/></div>;
+  return <div className="space-y-6"><PageHeading eyebrow="Maintenance" title={isSupervisor ? "Work Orders" : "My Work Orders"} description={isSupervisor ? "Assign and monitor Maintenance-owned repair and inspection records." : `Corrective work assigned to ${employee.name}.`} actions={isSupervisor ? <WorkOrderDialog defaultOpen={autoOpen} onCreate={createWorkOrder}/> : undefined}/>{message && <p role="status" className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.startsWith("Set") ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{message}</p>}<div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Service Request vs. Work Order:</strong> a Service Request is sent to Maintenance by another department. A Work Order is the Maintenance team’s internal job record for performing and documenting the repair.</div><Toolbar placeholder="Search work orders…"/><Card className="overflow-hidden"><CardHeader title="Active work orders" description={isSupervisor ? "Department work that still requires action" : "Work currently assigned to you"}/><div className="divide-y divide-slate-100">{rows(active)}{active.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No active Maintenance work orders.</p>}</div></Card><Card className="overflow-hidden"><CardHeader title="Completed work orders" description="Maintenance work completed or cancelled"/><div className="divide-y divide-slate-100">{rows(completed)}{completed.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No completed Maintenance work orders.</p>}</div></Card><WorkOrderEditor workOrder={selected} canAssign={isSupervisor} onClose={() => setSelected(null)} onSave={saveWorkOrder}/></div>;
 }
+
+function PreventiveMaintenance() {
+  const allWorkOrders = useWorkOrders();
+  const [employee, setEmployee] = useState<DemoEmployee>(demoEmployees["sam.rivera"]);
+  const [selected, setSelected] = useState<WorkOrder | null>(null);
+  useEffect(() => setEmployee(getDemoEmployeeSession("maintenance") ?? demoEmployees["sam.rivera"]), []);
+  const isSupervisor = Boolean(employee.isSupervisor);
+  const schedules = allWorkOrders.filter((order) => order.type === "Preventive" && (isSupervisor || order.assignee === employee.name));
+  function createSchedule(draft: PreventiveMaintenanceDraft) {
+    addWorkOrder({ id: `PM-${100 + allWorkOrders.length}`, ...draft, type: "Preventive", priority: "Standard", status: draft.assignee === "Unassigned" ? "Open" : "Assigned", due: draft.nextDue, createdAt: Date.now(), createdBy: employee.name, requiresHousekeepingClearance: false });
+  }
+  return <div className="space-y-6"><PageHeading eyebrow="Maintenance" title={isSupervisor ? "Preventive Maintenance" : "My Preventive Maintenance"} description={isSupervisor ? "Schedule recurring upkeep by guest room, amenity, public area, or hotel asset." : `Recurring maintenance assigned to ${employee.name}.`} actions={isSupervisor ? <PreventiveMaintenanceDialog onCreate={createSchedule}/> : undefined}/><Toolbar placeholder="Search room, area, asset, or category…"/><Card className="overflow-hidden"><CardHeader title="Maintenance schedule" description={isSupervisor ? "All preventive work for the property" : "Preventive work assigned to you"}/><div className="divide-y divide-slate-100">{schedules.map((order) => <button key={order.id} type="button" onClick={() => setSelected(order)} className="grid w-full gap-3 px-5 py-4 text-left hover:bg-slate-50 sm:px-6 md:grid-cols-[100px_1fr_150px_130px_130px] md:items-center"><span className="text-sm font-semibold text-brand">{order.id}</span><span><span className="block text-sm font-semibold text-slate-900">{order.title}</span><span className="mt-1 block text-xs text-slate-500">{order.location} · {order.category}</span></span><span className="text-sm text-slate-600">{order.frequency ?? "One time"}</span><span className="text-sm text-slate-500">{order.due ?? "Not scheduled"}</span><Badge tone={order.status === "Completed" ? "success" : order.status === "In Progress" ? "info" : "brand"}>{order.status}</Badge></button>)}{schedules.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No preventive maintenance is assigned for this view.</p>}</div></Card><WorkOrderEditor workOrder={selected} canAssign={isSupervisor} onClose={() => setSelected(null)} onSave={(updated) => updateWorkOrder(updated)}/></div>;
+}
+
+function csvCell(value: string | number) { return `"${String(value).replaceAll('"', '""')}"`; }
+function downloadMaintenanceFile(filename: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function MaintenanceReports() {
+  const workOrders = useWorkOrders();
+  const requests = useServiceRequests();
+  const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState(String(currentYear));
+  const inYear = (createdAt?: number) => !createdAt || new Date(createdAt).getFullYear() === Number(year);
+  const annualOrders = workOrders.filter((order) => inYear(order.createdAt));
+  const annualRequests = requests.filter((request) => request.assigned === "Maintenance" && inYear(request.createdAt));
+  const roomIssues = [...annualOrders.filter((order) => order.type !== "Preventive").map((order) => ({ room: order.location.match(/^Room\s+(\d+)/i)?.[1], issue: order.title, source: order.id })), ...annualRequests.map((request) => ({ room: request.location.match(/^Room\s+(\d+)/i)?.[1], issue: request.title, source: request.id }))].filter((item): item is { room: string; issue: string; source: string } => Boolean(item.room));
+  const roomSummary = Object.values(roomIssues.reduce<Record<string, { room: string; count: number; issues: Set<string> }>>((summary, item) => {
+    summary[item.room] ??= { room: item.room, count: 0, issues: new Set() };
+    summary[item.room].count += 1;
+    summary[item.room].issues.add(item.issue);
+    return summary;
+  }, {})).sort((a, b) => b.count - a.count || a.room.localeCompare(b.room, undefined, { numeric: true }));
+  const reportRows = annualOrders.map((order) => [order.id, order.type ?? "Corrective", order.title, order.location, order.category, order.priority, order.status, order.assignee, order.due ?? "", order.completionNotes ?? ""]);
+  const headers = ["ID", "Type", "Title", "Location", "Category", "Priority", "Status", "Assigned technician", "Due", "Completion notes"];
+  function exportCsv() { downloadMaintenanceFile(`staysync-maintenance-${year}.csv`, [headers, ...reportRows].map((row) => row.map(csvCell).join(",")).join("\n"), "text/csv;charset=utf-8"); }
+  function exportExcel() { const table = `<table><thead><tr>${headers.map((header) => `<th>${header}</th>`).join("")}</tr></thead><tbody>${reportRows.map((row) => `<tr>${row.map((cell) => `<td>${String(cell).replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</td>`).join("")}</tr>`).join("")}</tbody></table>`; downloadMaintenanceFile(`staysync-maintenance-${year}.xls`, table, "application/vnd.ms-excel"); }
+  return <div className="space-y-6"><PageHeading eyebrow="Maintenance" title="Maintenance Reports" description="Export annual Maintenance records and identify guest rooms with recurring operational issues." actions={<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={exportCsv}><Download className="size-4"/>Export CSV</Button><Button variant="secondary" onClick={exportExcel}><ArrowDownToLine className="size-4"/>Export Excel</Button></div>}/><label className="inline-flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">Report year<select aria-label="Maintenance report year" value={year} onChange={(event) => setYear(event.target.value)} className="bg-transparent text-sm font-semibold text-brand outline-none">{[0, 1, 2, 3, 4].map((offset) => <option key={currentYear - offset}>{currentYear - offset}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-3"><ReportMetric label="Work orders" value={String(annualOrders.length)} note={`Recorded in ${year}`}/><ReportMetric label="Preventive schedules" value={String(annualOrders.filter((order) => order.type === "Preventive").length)} note="Scheduled upkeep"/><ReportMetric label="Rooms with issues" value={String(roomSummary.length)} note="Unique guest rooms"/></div><Card className="overflow-hidden"><CardHeader title="Repeat room issues" description="Rooms ranked by the number of Maintenance requests and corrective work records"/><div className="divide-y divide-slate-100">{roomSummary.map((room, index) => <div key={room.room} className="grid gap-2 px-5 py-4 sm:grid-cols-[70px_1fr_120px] sm:items-center sm:px-6"><span className="text-sm font-bold text-brand">#{index + 1}</span><span><span className="block text-sm font-semibold text-slate-900">Room {room.room}</span><span className="mt-1 block text-xs text-slate-500">{[...room.issues].join(" · ")}</span></span><Badge tone={room.count >= 3 ? "urgent" : room.count === 2 ? "warning" : "neutral"}>{room.count} {room.count === 1 ? "issue" : "issues"}</Badge></div>)}{roomSummary.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No guest-room Maintenance issues were recorded for {year}.</p>}</div></Card></div>;
+}
+
+function ReportMetric({ label, value, note }: { label: string; value: string; note: string }) { return <Card className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></Card>; }
 
 function QualityScores() { const scores = [{ d: "Front Desk", score: 94, target: 92, date: "Jul 15, 2026", type: "Brand review" }, { d: "Housekeeping", score: 91, target: 93, date: "Jul 10, 2026", type: "Quality inspection" }, { d: "Maintenance", score: 96, target: 90, date: "Jul 12, 2026", type: "Internal audit" }]; return <div className="space-y-6"><PageHeading eyebrow="Management" title="Department quality scores" description="Record review scores and follow progress without turning work into a game." actions={<EntryDialog title="Add quality score" submitLabel="Save score" fields={["Department", "Score", "Target score", "Review date", "Review type", "Comments (optional)"]}/>}/><div className="grid gap-4 md:grid-cols-3">{scores.map((s) => <Card key={s.d} className="p-5"><p className="text-sm font-semibold text-slate-900">{s.d}</p><div className="mt-5 flex items-end gap-2"><p className="text-4xl font-bold tracking-tight">{s.score}%</p><p className="mb-1 text-xs text-slate-400">Target {s.target}%</p></div><div className="mt-4 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full ${s.score >= s.target ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${s.score}%` }}/></div><p className="mt-4 text-xs text-slate-500">{s.type} · {s.date}</p></Card>)}</div><Card><CardHeader title="Score history" description="Latest reviews across departments"/><div className="p-6 text-sm text-slate-500">Select a department above to view its complete score history and trend.</div></Card></div>; }
 

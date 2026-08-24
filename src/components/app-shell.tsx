@@ -19,7 +19,7 @@ const nav = {
     ["Overview", "", Home], ["Room Updates", "room-updates", CircleGauge], ["Assigned Rooms", "assigned-rooms", ClipboardList], ["Operations Log", "operations-log", BookOpenText], ["Service Requests", "service-requests", Wrench],
   ],
   maintenance: [
-    ["Overview", "", Home], ["Work Orders", "work-orders", Wrench], ["Service Requests", "service-requests", ClipboardList], ["Preventive", "preventive", CircleGauge], ["Operations Log", "operations-log", BookOpenText],
+    ["Overview", "", Home], ["Work Orders", "work-orders", Wrench], ["Service Requests", "service-requests", ClipboardList], ["Preventive", "preventive", CircleGauge], ["Maintenance Reports", "maintenance-reports", FileChartColumn], ["Operations Log", "operations-log", BookOpenText],
   ],
   manager: [
     ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["All Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Quality Scores", "quality-scores", Star], ["Reports", "reports", FileChartColumn], ["People", "people", Users], ["Properties", "properties", Building2],
@@ -29,7 +29,7 @@ const nav = {
 const users: Record<WorkspaceRole, { name: string; title: string; isSupervisor?: boolean }> = {
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
   housekeeping: { name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
-  maintenance: { name: "Jordan Lee", title: "Maintenance Technician" },
+  maintenance: { name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
   manager: { name: "Maya Chen", title: "Operations Manager", isSupervisor: true },
 };
 
@@ -48,7 +48,7 @@ export function AppShell({ role, children }: { role: WorkspaceRole; children: Re
   const base = `/app/${role}`;
   const departmentNotifications = useDepartmentNotifications(workspaceNames[role], Boolean(user.isSupervisor));
   const unreadNotifications = departmentNotifications.filter((notification) => !notification.readAt);
-  const navigationItems = nav[role].filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates"));
+  const navigationItems = nav[role].filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates") && !(role === "maintenance" && !user.isSupervisor && label === "Maintenance Reports"));
   const sidebar = <>
     <div className="flex h-[76px] items-center justify-between px-5"><Logo/><button className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="size-5"/></button></div>
     <div className="relative mx-3 mb-4 rounded-xl border border-brand-border bg-brand-soft p-3"><button type="button" onClick={() => setPropertyOpen((current) => !current)} className="flex min-h-11 w-full items-center gap-3 text-left" aria-label={`Current property: ${property}. Open property menu`} aria-expanded={propertyOpen}><span className="grid size-9 place-items-center rounded-lg bg-white text-brand shadow-sm"><Building2 className="size-4"/></span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{property}</span><span className="block text-xs text-slate-500">Northstar Hotels</span></span><ChevronDown className={cn("size-4 text-slate-400 transition-transform", propertyOpen && "rotate-180")}/></button>{propertyOpen && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" role="menu" aria-label="Authorized properties">{authorizedProperties.map((name) => <button key={name} type="button" role="menuitemradio" aria-checked={property === name} onClick={() => { setProperty(name); setPropertyOpen(false); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-50"><span className="min-w-0 flex-1 truncate font-medium">{name}</span>{property === name && <Check className="size-4 text-brand"/>}</button>)}{authorizedProperties.length === 1 && <p className="border-t border-slate-100 px-3 py-2 text-xs leading-5 text-slate-500">This is the only property assigned to your account.</p>}</div>}</div>

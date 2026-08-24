@@ -16,8 +16,8 @@ export const latestLogs = [
 export const serviceRequests = [
   { id: "SR-1049", title: "Confirm guest relocation follow-up", location: "Room 604", from: "Management", assigned: "Front Desk", priority: "High", status: "Assigned", due: "11:30 AM" },
   { id: "SR-1048", title: "Extra towels requested", location: "Room 718", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Unassigned", priority: "Standard", status: "Open", due: "10:30 AM" },
-  { id: "SR-1047", title: "Air conditioning not cooling", location: "Room 604", from: "Front Desk", assigned: "Maintenance", priority: "Urgent", status: "In Progress", due: "Overdue" },
-  { id: "SR-1046", title: "Meeting room temperature", location: "Maple Room", from: "Events", assigned: "Maintenance", priority: "High", status: "Open", due: "11:00 AM" },
+  { id: "SR-1047", title: "Air conditioning not cooling", location: "Room 604", from: "Front Desk", assigned: "Maintenance", assignedUser: "Jordan Lee", priority: "Urgent", status: "In Progress", due: "Overdue" },
+  { id: "SR-1046", title: "Meeting room temperature", location: "Maple Room", from: "Events", assigned: "Maintenance", assignedUser: "Unassigned", priority: "High", status: "Open", due: "11:00 AM" },
   { id: "SR-1045", title: "Crib delivery", location: "Room 312", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Elena Ruiz", priority: "High", status: "Completed", due: "Completed" },
   { id: "SR-1044", title: "Remove used room-service tray", location: "Room 526", from: "Front Desk", assigned: "Housekeeping", assignedUser: "Elena Ruiz", priority: "Standard", status: "Assigned", due: "12:00 PM" },
 ];
@@ -39,7 +39,7 @@ export const propertyDailyOperations = {
 
 export const workOrders = [
   { id: "WO-284", title: "AC not cooling", location: "Room 604", priority: "Urgent", status: "In Progress", assignee: "Jordan Lee", age: "52 min" },
-  { id: "WO-283", title: "Loose bathroom fixture", location: "Room 227", priority: "High", status: "Assigned", assignee: "Sam Rivera", age: "1 hr" },
+  { id: "WO-283", title: "Loose bathroom fixture", location: "Room 227", priority: "High", status: "Assigned", assignee: "Noah Wilson", age: "1 hr" },
   { id: "WO-279", title: "Inspect ice machine", location: "Floor 5", priority: "Standard", status: "Open", assignee: "Unassigned", age: "Due today" },
 ];
 
