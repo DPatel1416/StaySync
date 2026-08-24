@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/app/front-desk" }));
 describe("property selector", () => {
   it("shows the dropdown affordance and single assigned property state", () => {
     render(<AppShell role="front-desk"><div>Dashboard</div></AppShell>);
-    expect(screen.getByTestId("staysync-mark")).toHaveClass("bg-[#0284c7]");
+    expect(screen.getByTestId("staysync-mark")).toHaveClass("bg-[#caff4d]");
     const selector = screen.getByRole("button", { name: /Current property: Ottawa Downtown/ });
     expect(selector).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(selector);

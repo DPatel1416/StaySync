@@ -1,14 +1,21 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import LoginPage from "./page";
 
 describe("StaySync login identity", () => {
-  it("uses the dedicated atelier theme instead of a department theme", () => {
+  it("uses the dedicated signal theme instead of a department theme", () => {
     const { container } = render(<LoginPage/>);
-    expect(container.querySelector("main")).toHaveAttribute("data-login-theme", "atelier");
+    expect(container.querySelector("main")).toHaveAttribute("data-login-theme", "signal");
     expect(screen.getByLabelText("About StaySync")).toHaveClass("login-stage");
-    expect(screen.getAllByTestId("staysync-mark").every((mark) => mark.classList.contains("bg-[#f0715d]"))).toBe(true);
-    expect(screen.getAllByRole("heading", { name: /Good stays are choreographed./ }).length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Live shift coordination preview")).toBeInTheDocument();
+    expect(screen.getAllByTestId("staysync-mark").every((mark) => mark.classList.contains("bg-[#caff4d]"))).toBe(true);
+    expect(screen.getAllByRole("heading", { name: /Move as one./ }).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("A modern hotel access key floating in motion")).toBeInTheDocument();
+  });
+
+  it("changes the brand story for account holders", () => {
+    render(<LoginPage/>);
+    fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
+    expect(screen.getAllByRole("heading", { name: /See the whole./ }).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("A collection of hotel access keys moving into alignment")).toBeInTheDocument();
   });
 });
