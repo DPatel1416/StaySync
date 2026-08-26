@@ -1,4 +1,5 @@
 import type { WorkspaceRole } from "./permissions";
+import { getUserAccountByUsername } from "./user-account-store";
 
 export type DemoEmployee = { password: string; workspace: WorkspaceRole; name: string; title: string; isSupervisor?: boolean };
 
@@ -10,13 +11,14 @@ export const demoEmployees: Record<string, DemoEmployee> = {
   "sam.rivera": { password: "staysync-demo", workspace: "maintenance", name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
   "jordan.lee": { password: "staysync-demo", workspace: "maintenance", name: "Jordan Lee", title: "Maintenance Technician" },
   "noah.wilson": { password: "staysync-demo", workspace: "maintenance", name: "Noah Wilson", title: "Maintenance Technician" },
-  "maya.chen": { password: "staysync-demo", workspace: "manager", name: "Maya Chen", title: "Operations Manager", isSupervisor: true },
+  "maya.chen": { password: "staysync-demo", workspace: "manager", name: "Maya Chen", title: "General Manager", isSupervisor: true },
 };
 
 const sessionKey = "staysync-demo-employee";
 
 export function authenticateDemoEmployee(username: string, password: string) {
-  const employee = demoEmployees[username.trim().toLowerCase()];
+  const normalizedUsername = username.trim().toLowerCase();
+  const employee = typeof window !== "undefined" ? getUserAccountByUsername(normalizedUsername) : demoEmployees[normalizedUsername];
   return employee?.password === password ? employee : null;
 }
 
@@ -31,6 +33,6 @@ export function clearDemoEmployeeSession() {
 export function getDemoEmployeeSession(workspace: WorkspaceRole) {
   if (typeof window === "undefined") return null;
   const username = window.localStorage.getItem(sessionKey) ?? "";
-  const employee = demoEmployees[username];
+  const employee = getUserAccountByUsername(username);
   return employee?.workspace === workspace ? employee : null;
 }

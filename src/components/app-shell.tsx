@@ -10,6 +10,7 @@ import { workspaceNames } from "@/lib/demo-data";
 import type { WorkspaceRole } from "@/lib/permissions";
 import { markDepartmentNotificationRead, useDepartmentNotifications } from "@/lib/notification-store";
 import { clearDemoEmployeeSession, getDemoEmployeeSession } from "@/lib/demo-auth";
+import { useUserAccounts } from "@/lib/user-account-store";
 
 const nav = {
   "front-desk": [
@@ -30,10 +31,11 @@ const users: Record<WorkspaceRole, { name: string; title: string; isSupervisor?:
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
   housekeeping: { name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
   maintenance: { name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
-  manager: { name: "Maya Chen", title: "Operations Manager", isSupervisor: true },
+  manager: { name: "Maya Chen", title: "General Manager", isSupervisor: true },
 };
 
 export function AppShell({ role, children }: { role: WorkspaceRole; children: React.ReactNode }) {
+  const accounts = useUserAccounts();
   const [open, setOpen] = useState(false);
   const [propertyOpen, setPropertyOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -44,7 +46,7 @@ export function AppShell({ role, children }: { role: WorkspaceRole; children: Re
   useEffect(() => {
     const session = getDemoEmployeeSession(role);
     if (session) setUser({ name: session.name, title: session.title, isSupervisor: session.isSupervisor });
-  }, [role]);
+  }, [accounts, role]);
   const base = `/app/${role}`;
   const departmentNotifications = useDepartmentNotifications(workspaceNames[role], Boolean(user.isSupervisor));
   const unreadNotifications = departmentNotifications.filter((notification) => !notification.readAt);
