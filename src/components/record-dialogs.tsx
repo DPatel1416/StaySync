@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle, BellRing, Check, PackageSearch, Plus, ShieldAlert, Wrench, X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -22,11 +22,13 @@ type DialogFrameProps = {
 function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpen = false, icon: Icon = Plus, children, onSubmit }: DialogFrameProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [saved, setSaved] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (closeTimer.current !== null) window.clearTimeout(closeTimer.current); }, []);
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
     setSaved(true);
-    window.setTimeout(() => { setSaved(false); setOpen(false); }, 500);
+    closeTimer.current = window.setTimeout(() => { setSaved(false); setOpen(false); closeTimer.current = null; }, 500);
   }
   return <Dialog.Root open={open} onOpenChange={setOpen}>
     <Dialog.Trigger asChild><Button><Icon className="size-4"/>{triggerLabel}</Button></Dialog.Trigger>
@@ -129,6 +131,42 @@ export function IncidentDialog({ defaultOpen, onCreate }: { defaultOpen?: boolea
     <label className="block"><Label required>What happened?</Label><textarea name="description" required rows={4} className={textareaClass} placeholder="Record the facts, immediate action taken, and any follow-up needed."/></label>
     <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Assign to department</Label><select name="department" required defaultValue="Management" className={inputClass}><option>Management</option><option>Security</option><option>Maintenance</option><option>Housekeeping</option><option>Front Desk</option></select></label><label><Label required>Priority</Label><select name="priority" required defaultValue="Important" className={inputClass}><option>Standard</option><option>Important</option><option>High</option><option>Urgent</option></select></label></div>
     <label><Label>Supporting files</Label><input name="attachment" type="file" multiple className="block h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-semibold file:text-brand"/></label>
+  </DialogFrame>;
+}
+
+export type ManagementIncidentDraft = { property: string; occurredAt: string; category: string; location: string; severity: string; department: string; owner: string; description: string; immediateAction: string; reportable: boolean };
+export function ManagementIncidentDialog({ defaultOpen, onCreate }: { defaultOpen?: boolean; onCreate: (draft: ManagementIncidentDraft) => void }) {
+  return <DialogFrame title="Record management incident" description="Create the property’s management record, assign ownership, and document the immediate response." triggerLabel="Record incident" submitLabel="Create incident" defaultOpen={defaultOpen} icon={ShieldAlert} onSubmit={(data) => onCreate({ property: String(data.get("property")), occurredAt: String(data.get("occurredAt")), category: String(data.get("category")), location: String(data.get("location")), severity: String(data.get("severity")), department: String(data.get("department")), owner: String(data.get("owner")), description: String(data.get("description")), immediateAction: String(data.get("immediateAction")), reportable: data.get("reportable") === "on" })}>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Property</Label><select name="property" required defaultValue="Ottawa Downtown" className={inputClass}><option>Ottawa Downtown</option><option>Ottawa Airport</option></select></label><label><Label required>Date and time occurred</Label><input name="occurredAt" type="datetime-local" required className={inputClass}/></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Incident category</Label><select name="category" required defaultValue="" className={inputClass}><option value="" disabled>Select category</option><option>Guest safety</option><option>Employee safety</option><option>Security</option><option>Property damage</option><option>Service disruption</option><option>Privacy or data</option><option>Other</option></select></label><label><Label required>Room or location</Label><input name="location" required className={inputClass} placeholder="Room 604 or Pool corridor"/></label></div>
+    <label className="block"><Label required>Incident details</Label><textarea name="description" required rows={4} className={textareaClass} placeholder="Record the facts, people involved, and impact on guests or operations."/></label>
+    <label className="block"><Label required>Immediate action taken</Label><textarea name="immediateAction" required rows={3} className={textareaClass} placeholder="Describe how the situation was contained and who was notified."/></label>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Severity</Label><select name="severity" required defaultValue="Moderate" className={inputClass}><option>Low</option><option>Moderate</option><option>High</option><option>Critical</option></select></label><label><Label required>Responsible department</Label><select name="department" required defaultValue="Management" className={inputClass}><option>Management</option><option>Front Desk</option><option>Housekeeping</option><option>Maintenance</option><option>Security</option></select></label></div>
+    <label><Label required>Follow-up owner</Label><input name="owner" required defaultValue="General Manager" className={inputClass}/></label>
+    <label className="flex min-h-11 items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><input name="reportable" type="checkbox" className="mt-0.5 size-4 rounded border-amber-300 text-brand"/><span><strong className="block">External or regulatory reporting may be required</strong><span className="mt-0.5 block text-xs leading-5 text-amber-800">Flag this incident for management review of insurance, brand, police, health, or safety reporting obligations.</span></span></label>
+  </DialogFrame>;
+}
+
+export type QualityScoreDraft = { property: string; department: string; score: number; target: number; reviewDate: string; reviewType: string; reviewer: string; comments: string; followUp: boolean };
+export function QualityScoreDialog({ onCreate }: { onCreate: (draft: QualityScoreDraft) => void }) {
+  return <DialogFrame title="Add department quality review" description="Record a completed inspection or audit against the property’s quality target." triggerLabel="Add quality score" submitLabel="Save review" onSubmit={(data) => onCreate({ property: String(data.get("property")), department: String(data.get("department")), score: Number(data.get("score")), target: Number(data.get("target")), reviewDate: String(data.get("reviewDate")), reviewType: String(data.get("reviewType")), reviewer: String(data.get("reviewer")), comments: String(data.get("comments")), followUp: data.get("followUp") === "on" })}>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Property</Label><select name="property" required defaultValue="Ottawa Downtown" className={inputClass}><option>Ottawa Downtown</option><option>Ottawa Airport</option></select></label><label><Label required>Department</Label><select name="department" required defaultValue="" className={inputClass}><option value="" disabled>Select department</option><option>Front Desk</option><option>Housekeeping</option><option>Maintenance</option><option>Food & Beverage</option><option>Security</option></select></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Score (%)</Label><input name="score" type="number" min="0" max="100" required className={inputClass} placeholder="94"/></label><label><Label required>Target (%)</Label><input name="target" type="number" min="0" max="100" required defaultValue="90" className={inputClass}/></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Review date</Label><input name="reviewDate" type="date" required className={inputClass}/></label><label><Label required>Review type</Label><select name="reviewType" required defaultValue="Quality inspection" className={inputClass}><option>Quality inspection</option><option>Brand review</option><option>Internal audit</option><option>Guest experience review</option><option>Safety inspection</option></select></label></div>
+    <label><Label required>Reviewed by</Label><input name="reviewer" required defaultValue="General Manager" className={inputClass}/></label>
+    <label className="block"><Label>Comments and corrective actions</Label><textarea name="comments" rows={3} className={textareaClass} placeholder="Note findings, strengths, and required follow-up."/></label>
+    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="followUp" type="checkbox" className="size-4 rounded border-slate-300 text-brand"/>Corrective follow-up is required</label>
+  </DialogFrame>;
+}
+
+export type PropertyDraft = { name: string; code: string; address: string; city: string; region: string; postalCode: string; timezone: string; rooms: number; status: string };
+export function PropertyDialog({ onCreate }: { onCreate: (draft: PropertyDraft) => void }) {
+  return <DialogFrame title="Add property" description="Set up the hotel’s identity, location, operating timezone, and room inventory." triggerLabel="Add property" submitLabel="Create property" onSubmit={(data) => onCreate({ name: String(data.get("name")), code: String(data.get("code")).toUpperCase(), address: String(data.get("address")), city: String(data.get("city")), region: String(data.get("region")), postalCode: String(data.get("postalCode")), timezone: String(data.get("timezone")), rooms: Number(data.get("rooms")), status: String(data.get("status")) })}>
+    <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><label><Label required>Property name</Label><input name="name" required className={inputClass} placeholder="Ottawa West"/></label><label><Label required>Property code</Label><input name="code" required maxLength={12} className={inputClass} placeholder="OTT-WEST"/></label></div>
+    <label className="block"><Label required>Street address</Label><input name="address" required autoComplete="street-address" className={inputClass} placeholder="100 Example Street"/></label>
+    <div className="grid gap-4 sm:grid-cols-3"><label><Label required>City</Label><input name="city" required className={inputClass} placeholder="Ottawa"/></label><label><Label required>Province/state</Label><input name="region" required className={inputClass} placeholder="Ontario"/></label><label><Label required>Postal code</Label><input name="postalCode" required className={inputClass} placeholder="K1A 0B1"/></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Timezone</Label><select name="timezone" required defaultValue="America/Toronto" className={inputClass}><option>America/Toronto</option><option>America/Vancouver</option><option>America/Edmonton</option><option>America/Winnipeg</option><option>America/Halifax</option><option>America/St_Johns</option></select></label><label><Label required>Guest rooms</Label><input name="rooms" type="number" min="1" required className={inputClass} placeholder="142"/></label></div>
+    <label><Label required>Opening status</Label><select name="status" required defaultValue="Active" className={inputClass}><option>Active</option><option>Pre-opening</option><option>Temporarily closed</option></select></label>
   </DialogFrame>;
 }
 

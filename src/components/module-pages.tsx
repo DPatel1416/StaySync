@@ -10,7 +10,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
 import { ListRows, PageHeading } from "./dashboard/shared";
-import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, OperationLogDialog, PreventiveMaintenanceDialog, ServiceRequestDialog, WorkOrderDialog, type PreventiveMaintenanceDraft, type WorkOrderDraft } from "./record-dialogs";
+import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, ManagementIncidentDialog, OperationLogDialog, PreventiveMaintenanceDialog, PropertyDialog, QualityScoreDialog, ServiceRequestDialog, WorkOrderDialog, type PreventiveMaintenanceDraft, type WorkOrderDraft } from "./record-dialogs";
 import { canModifyOperationLog, IncidentEditor, LostFoundEditor, OperationLogEditor, ServiceRequestEditor, WorkOrderEditor, type EditableLog, type EditableOperationalRecord, type EditableRequest } from "./record-update-dialogs";
 import { addRoomUpdate, isInformationalRoomChange, markRoomClearedByMaintenance, updateRoomUpdateState, useRoomUpdates } from "@/lib/room-update-store";
 import { addServiceRequest, deleteServiceRequest, updateServiceRequest, useServiceRequests } from "@/lib/service-request-store";
@@ -35,6 +35,7 @@ export function ModulePage({ role, module, create = false, requestId }: { role: 
   if (module === "operations-log") return <OperationsLog role={role} autoOpen={create}/>;
   if (module === "service-requests") return <ServiceRequests role={role} autoOpen={create} initialRequestId={requestId}/>;
   if (module === "incidents" && role === "front-desk") return <IncidentsPage autoOpen={create}/>;
+  if (module === "incidents" && role === "manager") return <ManagementIncidentsPage autoOpen={create}/>;
   if (module === "lost-found" && role === "front-desk") return <LostFoundPage autoOpen={create}/>;
   if (module === "room-updates") return <RoomStatus role={role} autoOpen={create}/>;
   if (module === "assigned-rooms" && role === "housekeeping") return <AssignedRooms/>;
@@ -42,6 +43,7 @@ export function ModulePage({ role, module, create = false, requestId }: { role: 
   if (module === "preventive") return <PreventiveMaintenance/>;
   if (module === "maintenance-reports") return <MaintenanceReports/>;
   if (module === "quality-scores") return <QualityScores/>;
+  if (module === "properties" && role === "manager") return <PropertiesPage/>;
   if (module === "reports") return <Reports/>;
   if (module === "people" && role === "manager") return <PeoplePage/>;
   if (module === "settings") return <AccountSettings role={role}/>;
@@ -289,7 +291,30 @@ function MaintenanceReports() {
 
 function ReportMetric({ label, value, note }: { label: string; value: string; note: string }) { return <Card className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></Card>; }
 
-function QualityScores() { const scores = [{ d: "Front Desk", score: 94, target: 92, date: "Jul 15, 2026", type: "Brand review" }, { d: "Housekeeping", score: 91, target: 93, date: "Jul 10, 2026", type: "Quality inspection" }, { d: "Maintenance", score: 96, target: 90, date: "Jul 12, 2026", type: "Internal audit" }]; return <div className="space-y-6"><PageHeading eyebrow="Management" title="Department quality scores" description="Record review scores and follow progress without turning work into a game." actions={<EntryDialog title="Add quality score" submitLabel="Save score" fields={["Department", "Score", "Target score", "Review date", "Review type", "Comments (optional)"]}/>}/><div className="grid gap-4 md:grid-cols-3">{scores.map((s) => <Card key={s.d} className="p-5"><p className="text-sm font-semibold text-slate-900">{s.d}</p><div className="mt-5 flex items-end gap-2"><p className="text-4xl font-bold tracking-tight">{s.score}%</p><p className="mb-1 text-xs text-slate-400">Target {s.target}%</p></div><div className="mt-4 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full ${s.score >= s.target ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${s.score}%` }}/></div><p className="mt-4 text-xs text-slate-500">{s.type} · {s.date}</p></Card>)}</div><Card><CardHeader title="Score history" description="Latest reviews across departments"/><div className="p-6 text-sm text-slate-500">Select a department above to view its complete score history and trend.</div></Card></div>; }
+function QualityScores() {
+  const [scores, setScores] = useState([
+    { id: "quality-fd", department: "Front Desk", property: "Ottawa Downtown", score: 94, target: 92, date: "Jul 15, 2026", type: "Brand review", reviewer: "General Manager", followUp: false },
+    { id: "quality-hk", department: "Housekeeping", property: "Ottawa Downtown", score: 91, target: 93, date: "Jul 10, 2026", type: "Quality inspection", reviewer: "General Manager", followUp: true },
+    { id: "quality-mt", department: "Maintenance", property: "Ottawa Downtown", score: 96, target: 90, date: "Jul 12, 2026", type: "Internal audit", reviewer: "General Manager", followUp: false },
+  ]);
+  return <div className="space-y-6"><PageHeading eyebrow="Management" title="Department quality scores" description="Record completed property reviews, compare results with targets, and flag corrective follow-up." actions={<QualityScoreDialog onCreate={(draft) => setScores([{ id: `quality-${Date.now()}`, department: draft.department, property: draft.property, score: draft.score, target: draft.target, date: draft.reviewDate, type: draft.reviewType, reviewer: draft.reviewer, followUp: draft.followUp }, ...scores])}/>}/><div className="grid gap-4 md:grid-cols-3">{scores.map((score) => <Card key={score.id} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{score.department}</p><p className="mt-1 text-xs text-slate-400">{score.property}</p></div>{score.followUp && <Badge tone="warning">Follow-up required</Badge>}</div><div className="mt-5 flex items-end gap-2"><p className="text-4xl font-bold tracking-tight">{score.score}%</p><p className="mb-1 text-xs text-slate-400">Target {score.target}%</p></div><div className="mt-4 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full ${score.score >= score.target ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${score.score}%` }}/></div><p className="mt-4 text-xs text-slate-500">{score.type} · {score.date} · {score.reviewer}</p></Card>)}</div><Card><CardHeader title="Score history" description="Latest completed reviews across properties and departments"/><div className="p-6 text-sm text-slate-500">Select a department above to review findings, corrective actions, and past scores.</div></Card></div>;
+}
+
+function ManagementIncidentsPage({ autoOpen = false }: { autoOpen?: boolean }) {
+  const [incidents, setIncidents] = useState([
+    { id: "INC-209", category: "Service disruption", property: "Ottawa Downtown", location: "Room 604", severity: "High", owner: "General Manager", department: "Maintenance", status: "Awaiting review", reportable: false },
+    { id: "INC-208", category: "Guest safety", property: "Ottawa Downtown", location: "Pool corridor", severity: "Moderate", owner: "General Manager", department: "Management", status: "Follow-up open", reportable: true },
+  ]);
+  return <div className="space-y-6"><PageHeading eyebrow="Management" title="Incidents" description="Maintain the property-level incident record, assign follow-up ownership, and review reporting obligations." actions={<ManagementIncidentDialog defaultOpen={autoOpen} onCreate={(draft) => setIncidents([{ id: `INC-${210 + incidents.length}`, category: draft.category, property: draft.property, location: draft.location, severity: draft.severity, owner: draft.owner, department: draft.department, status: "Open", reportable: draft.reportable }, ...incidents])}/>}/><Toolbar placeholder="Search incidents, properties, or locations…"/><Card><div className="divide-y divide-slate-100">{incidents.map((incident) => <article key={incident.id} className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:px-6"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-900">{incident.id} · {incident.category}</p>{incident.reportable && <Badge tone="warning">Reporting review</Badge>}</div><p className="mt-1 text-sm text-slate-500">{incident.property} · {incident.location} · Owner: {incident.owner}</p><p className="mt-1 text-xs text-slate-400">Responsible department: {incident.department}</p></div><Badge tone={incident.severity === "Critical" || incident.severity === "High" ? "urgent" : "warning"}>{incident.severity}</Badge><Badge tone="info">{incident.status}</Badge></article>)}</div></Card></div>;
+}
+
+function PropertiesPage() {
+  const [properties, setProperties] = useState([
+    { id: "property-downtown", name: "Ottawa Downtown", code: "OTT-DT", location: "Ottawa, Ontario", rooms: 142, timezone: "America/Toronto", status: "Active" },
+    { id: "property-airport", name: "Ottawa Airport", code: "OTT-AP", location: "Ottawa, Ontario", rooms: 118, timezone: "America/Toronto", status: "Active" },
+  ]);
+  return <div className="space-y-6"><PageHeading eyebrow="Northstar Hotels" title="Properties" description="Manage hotel identity, location, operating timezone, and room inventory." actions={<PropertyDialog onCreate={(draft) => setProperties([{ id: `property-${Date.now()}`, name: draft.name, code: draft.code, location: `${draft.city}, ${draft.region}`, rooms: draft.rooms, timezone: draft.timezone, status: draft.status }, ...properties])}/>}/><Toolbar placeholder="Search properties, codes, or locations…"/><Card><div className="divide-y divide-slate-100">{properties.map((property) => <article key={property.id} className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:px-6"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-900">{property.name}</p><span className="text-xs font-semibold text-slate-400">{property.code}</span></div><p className="mt-1 text-sm text-slate-500">{property.location} · {property.rooms} rooms · {property.timezone}</p></div><Badge tone={property.status === "Active" ? "success" : "warning"}>{property.status}</Badge></article>)}</div></Card></div>;
+}
 
 function AccountSettings({ role }: { role: WorkspaceRole }) {
   const accounts = useUserAccounts();

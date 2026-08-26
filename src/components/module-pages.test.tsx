@@ -294,6 +294,58 @@ describe("People and access", () => {
   });
 });
 
+describe("General Manager record creation", () => {
+  it("collects hotel configuration when adding a property", () => {
+    render(<ModulePage role="manager" module="properties"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Add property" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^Property name/), { target: { value: "Ottawa West" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Property code/), { target: { value: "ott-west" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Street address/), { target: { value: "100 Example Street" } });
+    fireEvent.change(within(dialog).getByLabelText(/^City/), { target: { value: "Ottawa" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Province\/state/), { target: { value: "Ontario" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Postal code/), { target: { value: "K1A 0B1" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Guest rooms/), { target: { value: "96" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create property" }));
+    expect(screen.getByText("Ottawa West")).toBeInTheDocument();
+    expect(screen.getByText(/96 rooms/)).toBeInTheDocument();
+    expect(screen.getByText("OTT-WEST")).toBeInTheDocument();
+  });
+
+  it("records a department quality review against a property target", () => {
+    render(<ModulePage role="manager" module="quality-scores"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Add quality score" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^Property/), { target: { value: "Ottawa Airport" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Department/), { target: { value: "Housekeeping" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Score/), { target: { value: "88" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Review date/), { target: { value: "2026-08-26" } });
+    fireEvent.click(within(dialog).getByLabelText("Corrective follow-up is required"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save review" }));
+    const scoreCard = screen.getByText("88%").closest("section");
+    expect(scoreCard).not.toBeNull();
+    expect(within(scoreCard!).getByText("Ottawa Airport")).toBeInTheDocument();
+    expect(within(scoreCard!).getByText("Follow-up required")).toBeInTheDocument();
+  });
+
+  it("creates a management incident with severity and follow-up ownership", () => {
+    render(<ModulePage role="manager" module="incidents" create/>);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^Date and time occurred/), { target: { value: "2026-08-26T09:15" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Incident category/), { target: { value: "Security" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Room or location/), { target: { value: "West entrance" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Incident details/), { target: { value: "Unauthorized access was observed." } });
+    fireEvent.change(within(dialog).getByLabelText(/^Immediate action taken/), { target: { value: "Security secured the entrance." } });
+    fireEvent.change(within(dialog).getByLabelText(/^Severity/), { target: { value: "Critical" } });
+    fireEvent.click(within(dialog).getByLabelText(/External or regulatory reporting/));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create incident" }));
+    const incidentRow = screen.getByText(/INC-212/).closest("article");
+    expect(incidentRow).not.toBeNull();
+    expect(within(incidentRow!).getByText("Critical")).toBeInTheDocument();
+    expect(within(incidentRow!).getByText("Reporting review")).toBeInTheDocument();
+  });
+});
+
 describe("Operations Log conversations", () => {
   it("shows department entries and entries explicitly shared with Front Desk", () => {
     render(<ModulePage role="front-desk" module="operations-log"/>);
