@@ -4,6 +4,7 @@ export const workspaceNames: Record<WorkspaceRole, string> = {
   "front-desk": "Front Desk",
   housekeeping: "Housekeeping",
   maintenance: "Maintenance",
+  "food-beverage": "Food & Beverage",
   manager: "Management",
 };
 

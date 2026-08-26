@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { getAuthenticatedViewer, isLocalDemoMode } from "@/lib/auth/viewer";
 import type { WorkspaceRole } from "@/lib/permissions";
 
-const valid = new Set(["front-desk", "housekeeping", "maintenance", "manager"]);
+const valid = new Set(["front-desk", "housekeeping", "maintenance", "food-beverage", "manager"]);
 
 export default async function WorkspaceLayout({ children, params }: { children: React.ReactNode; params: Promise<{ workspace: string }> }) {
   const { workspace } = await params;

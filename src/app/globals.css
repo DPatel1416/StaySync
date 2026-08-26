@@ -79,6 +79,13 @@ a, button, input, select, textarea { outline: none; }
   --brand-muted: 254 243 199;
   --brand-border: 253 230 138;
 }
+[data-department-theme="food-beverage"] {
+  --brand: 3 105 161;
+  --brand-strong: 7 89 133;
+  --brand-soft: 240 249 255;
+  --brand-muted: 224 242 254;
+  --brand-border: 186 230 253;
+}
 [data-department-theme="manager"] {
   --brand: 109 40 217;
   --brand-strong: 91 33 182;

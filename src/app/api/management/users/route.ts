@@ -26,7 +26,7 @@ export async function GET() {
     departmentIds.length ? admin.from("departments").select("id, code").in("id", departmentIds) : Promise.resolve({ data: [] }),
   ]);
   const propertyById = new Map((properties ?? []).map((property) => [property.id, property.name]));
-  const workspaceByCode: Record<string, string> = { FRONT_DESK: "front-desk", HOUSEKEEPING: "housekeeping", MAINTENANCE: "maintenance", MANAGEMENT: "manager" };
+  const workspaceByCode: Record<string, string> = { FRONT_DESK: "front-desk", HOUSEKEEPING: "housekeeping", MAINTENANCE: "maintenance", FOOD_BEVERAGE: "food-beverage", MANAGEMENT: "manager" };
   const departmentById = new Map((departments ?? []).map((department) => [department.id, workspaceByCode[department.code] ?? "front-desk"]));
   return NextResponse.json({ users: profiles.map((profile) => ({
     id: profile.id,

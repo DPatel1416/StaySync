@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       { name: "Front Desk", code: "FRONT_DESK", accent_color: "indigo" },
       { name: "Housekeeping", code: "HOUSEKEEPING", accent_color: "teal" },
       { name: "Maintenance", code: "MAINTENANCE", accent_color: "amber" },
+      { name: "Food & Beverage", code: "FOOD_BEVERAGE", accent_color: "sky" },
       { name: "Management", code: "MANAGEMENT", accent_color: "slate" },
     ].map((department) => ({ ...department, organization_id: access.viewer.organizationId, property_id: property.id }));
     const { error: departmentError } = await admin.from("departments").insert(departments);

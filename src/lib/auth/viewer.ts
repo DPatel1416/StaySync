@@ -22,6 +22,7 @@ const workspaceByDepartment: Record<string, WorkspaceRole> = {
   FRONT_DESK: "front-desk",
   HOUSEKEEPING: "housekeeping",
   MAINTENANCE: "maintenance",
+  FOOD_BEVERAGE: "food-beverage",
   MANAGEMENT: "manager",
 };
 

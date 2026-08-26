@@ -24,6 +24,7 @@ export const departmentTitles: Record<WorkspaceRole, string[]> = {
   "front-desk": ["Front Desk Agent", "Front Desk Supervisor"],
   housekeeping: ["Housekeeping Attendant", "Housekeeping Supervisor"],
   maintenance: ["Maintenance Technician", "Maintenance Supervisor"],
+  "food-beverage": ["Food & Beverage Team Member"],
 };
 
 export const departmentLabels: Record<WorkspaceRole, string> = {
@@ -31,6 +32,7 @@ export const departmentLabels: Record<WorkspaceRole, string> = {
   "front-desk": "Front Desk",
   housekeeping: "Housekeeping",
   maintenance: "Maintenance",
+  "food-beverage": "Food & Beverage",
 };
 
 const seedAccounts: UserAccount[] = [
@@ -42,6 +44,7 @@ const seedAccounts: UserAccount[] = [
   { id: "user-sam", name: "Sam Rivera", username: "sam.rivera", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Supervisor", isSupervisor: true, property: "Ottawa Downtown", status: "Active" },
   { id: "user-jordan", name: "Jordan Lee", username: "jordan.lee", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
   { id: "user-noah", name: "Noah Wilson", username: "noah.wilson", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-olivia", name: "Olivia Bennett", username: "olivia.bennett", password: "staysync-demo", workspace: "food-beverage", title: "Food & Beverage Team Member", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
 ];
 
 const storageKey = "staysync-user-accounts";

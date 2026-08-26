@@ -13,6 +13,12 @@ describe("demo employee authentication", () => {
     expect(authenticateDemoEmployee("jordan.lee", "staysync-demo")?.workspace).toBe("maintenance");
   });
 
+  it("routes Food & Beverage credentials without supervisor access", () => {
+    const employee = authenticateDemoEmployee("olivia.bennett", "staysync-demo");
+    expect(employee?.workspace).toBe("food-beverage");
+    expect(employee?.isSupervisor).not.toBe(true);
+  });
+
   it("rejects an incorrect password", () => {
     expect(authenticateDemoEmployee("jordan.lee", "wrong-password")).toBeNull();
   });

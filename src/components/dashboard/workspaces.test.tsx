@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
+import { FoodBeverageDashboard, FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
 import { updateServiceRequest } from "@/lib/service-request-store";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { getDepartmentNotifications } from "@/lib/notification-store";
@@ -12,6 +12,16 @@ vi.hoisted(() => {
 afterAll(() => vi.useRealTimers());
 
 afterEach(() => clearDemoEmployeeSession());
+
+describe("Food & Beverage dashboard", () => {
+  it("offers only Operations Log and Incident Report actions", () => {
+    render(<FoodBeverageDashboard/>);
+    expect(screen.getByRole("link", { name: /Add Operations Log/ })).toHaveAttribute("href", "/app/food-beverage/operations-log?create=1");
+    expect(screen.getByRole("link", { name: /Report Incident/ })).toHaveAttribute("href", "/app/food-beverage/incidents?create=1");
+    expect(screen.queryByText("Service Requests")).not.toBeInTheDocument();
+    expect(screen.queryByText("Work Orders")).not.toBeInTheDocument();
+  });
+});
 
 describe("dynamic room-change summaries", () => {
   it("groups late checkouts by time and counts stayovers on Front Desk", () => {

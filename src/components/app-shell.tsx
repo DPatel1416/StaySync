@@ -24,6 +24,9 @@ const nav = {
   maintenance: [
     ["Overview", "", Home], ["Work Orders", "work-orders", Wrench], ["Service Requests", "service-requests", ClipboardList], ["Preventive", "preventive", CircleGauge], ["Maintenance Reports", "maintenance-reports", FileChartColumn], ["Operations Log", "operations-log", BookOpenText],
   ],
+  "food-beverage": [
+    ["Operations Log", "operations-log", BookOpenText], ["Incident Reports", "incidents", ShieldAlert],
+  ],
   manager: [
     ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["All Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Quality Scores", "quality-scores", Star], ["Reports", "reports", FileChartColumn], ["People", "people", Users], ["Properties", "properties", Building2],
   ],
@@ -33,6 +36,7 @@ const users: Record<WorkspaceRole, { name: string; title: string; isSupervisor?:
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
   housekeeping: { name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
   maintenance: { name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
+  "food-beverage": { name: "Olivia Bennett", title: "Food & Beverage Team Member" },
   manager: { name: "Maya Chen", title: "General Manager", isSupervisor: true },
 };
 

@@ -3,7 +3,10 @@ import { ModulePage } from "@/components/module-pages";
 import { getAuthenticatedViewer, isLocalDemoMode } from "@/lib/auth/viewer";
 import type { Permission, WorkspaceRole } from "@/lib/permissions";
 
-const roles = new Set(["front-desk", "housekeeping", "maintenance", "manager"]);
+const roles = new Set(["front-desk", "housekeeping", "maintenance", "food-beverage", "manager"]);
+const allowedModules: Partial<Record<WorkspaceRole, Set<string>>> = {
+  "food-beverage": new Set(["operations-log", "incidents", "settings"]),
+};
 const managerModulePermissions: Record<string, Permission> = {
   people: "MANAGE_USERS",
   properties: "MANAGE_PROPERTIES",
@@ -17,10 +20,12 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const { workspace, module } = await params;
   const query = await searchParams;
   if (!roles.has(workspace)) notFound();
+  const workspaceRole = workspace as WorkspaceRole;
+  if (allowedModules[workspaceRole] && !allowedModules[workspaceRole]!.has(module)) notFound();
   const viewer = await getAuthenticatedViewer();
   if (viewer && workspace === "manager") {
     const required = managerModulePermissions[module];
     if (required && !viewer.permissions.includes(required)) notFound();
   } else if (!viewer && !isLocalDemoMode()) notFound();
-  return <ModulePage role={workspace as WorkspaceRole} module={module} create={query.create === "1"} requestId={query.request}/>;
+  return <ModulePage role={workspaceRole} module={module} create={query.create === "1"} requestId={query.request}/>;
 }

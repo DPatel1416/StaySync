@@ -3,13 +3,14 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rolePermissions, type Permission, type WorkspaceRole } from "@/lib/permissions";
 
-export const employeeWorkspaces = ["front-desk", "housekeeping", "maintenance"] as const;
+export const employeeWorkspaces = ["front-desk", "housekeeping", "maintenance", "food-beverage"] as const;
 export type EmployeeWorkspace = (typeof employeeWorkspaces)[number];
 
 export const departmentCodeByWorkspace: Record<EmployeeWorkspace, string> = {
   "front-desk": "FRONT_DESK",
   housekeeping: "HOUSEKEEPING",
   maintenance: "MAINTENANCE",
+  "food-beverage": "FOOD_BEVERAGE",
 };
 
 function permissionsFor(title: string, workspace: EmployeeWorkspace): Permission[] {

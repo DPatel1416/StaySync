@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       { organization_id: profile.organization_id, property_id: property.id, name: "Front Desk", code: "FRONT_DESK", accent_color: "indigo" },
       { organization_id: profile.organization_id, property_id: property.id, name: "Housekeeping", code: "HOUSEKEEPING", accent_color: "teal" },
       { organization_id: profile.organization_id, property_id: property.id, name: "Maintenance", code: "MAINTENANCE", accent_color: "amber" },
+      { organization_id: profile.organization_id, property_id: property.id, name: "Food & Beverage", code: "FOOD_BEVERAGE", accent_color: "sky" },
       { organization_id: profile.organization_id, property_id: property.id, name: "Management", code: "MANAGEMENT", accent_color: "violet" },
     ]);
     if (departmentsError) throw departmentsError;

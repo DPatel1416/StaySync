@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
@@ -39,5 +39,15 @@ describe("property selector", () => {
     clearDemoEmployeeSession();
     render(<AppShell role="maintenance"><div>Supervisor dashboard</div></AppShell>);
     expect(screen.getAllByRole("link", { name: "Maintenance Reports" }).length).toBeGreaterThan(0);
+  });
+
+  it("shows Food & Beverage only its two operational modules", () => {
+    render(<AppShell role="food-beverage"><div>Food and Beverage dashboard</div></AppShell>);
+    const navigation = screen.getByRole("navigation", { name: "Primary navigation" });
+    expect(within(navigation).getByRole("link", { name: "Operations Log" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("link", { name: "Incident Reports" })).toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "Service Requests" })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "Reports" })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "People" })).not.toBeInTheDocument();
   });
 });

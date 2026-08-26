@@ -10,7 +10,7 @@ export function PageHeading({ eyebrow, title, description, actions }: { eyebrow:
 }
 
 export function QuickActions({ items }: { items: Array<{ label: string; icon: React.ElementType; primary?: boolean; href?: string }> }) {
-  return <section aria-labelledby="quick-actions"><h2 id="quick-actions" className="sr-only">Quick actions</h2><div className={`grid grid-cols-2 gap-3 ${items.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>{items.map(({ label, icon: Icon, primary, href }) => {
+  return <section aria-labelledby="quick-actions"><h2 id="quick-actions" className="sr-only">Quick actions</h2><div className={`grid grid-cols-2 gap-3 ${items.length === 2 ? "max-w-2xl lg:grid-cols-2" : items.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>{items.map(({ label, icon: Icon, primary, href }) => {
     const className = `group flex min-h-[76px] items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold shadow-soft transition hover:-translate-y-0.5 hover:shadow-md ${primary ? "border-brand bg-brand text-white" : "border-slate-200 bg-white text-slate-800"}`;
     const content = <><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${primary ? "bg-white/15 text-white" : "bg-brand-soft text-brand"}`}><Icon className="size-[19px]"/></span><span className="leading-5">{label}</span><ArrowRight className={`ml-auto hidden size-4 transition group-hover:translate-x-0.5 sm:block ${primary ? "text-brand-border" : "text-slate-300"}`}/></>;
     return href ? <Link key={label} href={href} className={className}>{content}</Link> : <button key={label} className={className}>{content}</button>;

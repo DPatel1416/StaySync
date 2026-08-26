@@ -20,6 +20,6 @@ export async function POST(request: Request) {
   if (error || !data.session) return NextResponse.json({ error: "The username or password is incorrect." }, { status: 401 });
   const { data: profile } = await admin.from("users").select("department_id, account_kind").eq("id", data.user.id).single();
   const { data: department } = profile?.department_id ? await admin.from("departments").select("code").eq("id", profile.department_id).single() : { data: null };
-  const workspaceByDepartment: Record<string, string> = { FRONT_DESK: "front-desk", HOUSEKEEPING: "housekeeping", MAINTENANCE: "maintenance", MANAGEMENT: "manager" };
+  const workspaceByDepartment: Record<string, string> = { FRONT_DESK: "front-desk", HOUSEKEEPING: "housekeeping", MAINTENANCE: "maintenance", FOOD_BEVERAGE: "food-beverage", MANAGEMENT: "manager" };
   return NextResponse.json({ session: data.session, workspace: workspaceByDepartment[department?.code ?? ""] ?? "front-desk", requiresPasswordChange: Boolean(data.user.user_metadata.requires_password_change) });
 }

@@ -116,6 +116,10 @@ export function ManagerDashboard({ viewer = null }: { viewer?: AuthenticatedView
     <Card><CardHeader title="Recent escalations" description="Items that need management visibility"/><ListRows rows={[{ title: "Room 604 · Repeated AC issue", detail: "Third report in 30 days · Maintenance", badge: "Investigate", tone: "urgent" }, { title: "Virtual card discrepancy", detail: "OTA booking · Room 521 · $184.50", badge: "Assigned", tone: "warning" }, { title: "Guest relocation follow-up", detail: "Incident INC-209 · Front Desk", badge: "Review", tone: "info" }]}/></Card></div>;
 }
 
+export function FoodBeverageDashboard() {
+  return <div className="space-y-6"><PageHeading eyebrow="Food & Beverage" title="Good morning" description="Share department updates and report operational incidents."/><QuickActions items={[{ label: "Add Operations Log", icon: BookPlus, primary: true, href: "/app/food-beverage/operations-log?create=1" }, { label: "Report Incident", icon: ShieldPlus, href: "/app/food-beverage/incidents?create=1" }]}/><OperationsPreview base="/app/food-beverage" role="food-beverage"/></div>;
+}
+
 function Metric({ label, value }: { label: string; value: string }) { return <div className="bg-white p-5"><p className="text-2xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-1 text-xs font-medium text-slate-500">{label}</p></div>; }
 function DashboardEmpty({ message }: { message: string }) { return <div className="px-5 py-8 text-center text-sm text-slate-500 sm:px-6">{message}</div>; }
 function Summary({ label, value, note, urgent, success }: { label: string; value: string; note: string; urgent?: boolean; success?: boolean }) { return <Card className="p-4 sm:p-5"><div className="flex items-center gap-2"><span className={`size-2 rounded-full ${urgent ? "bg-rose-500" : success ? "bg-emerald-500" : "bg-brand"}`} aria-hidden="true"/><p className="text-xs font-semibold text-slate-500">{label}</p></div><p className="mt-3 text-3xl font-bold tracking-[-.04em] text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></Card>; }

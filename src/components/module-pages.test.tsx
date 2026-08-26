@@ -250,6 +250,16 @@ describe("Account settings", () => {
 });
 
 describe("People and access", () => {
+  it("offers one shared Food & Beverage position with limited access", () => {
+    render(<ModulePage role="manager" module="people"/>);
+    fireEvent.click(screen.getByRole("button", { name: "Create user" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Department"), { target: { value: "food-beverage" } });
+    expect(within(dialog).getByLabelText("Position")).toHaveValue("Food & Beverage Team Member");
+    expect(within(dialog).getAllByRole("option", { name: /Food & Beverage Team Member/ })).toHaveLength(1);
+    expect(within(dialog).getByText(/Operations Log and Incident Reports access only/)).toBeInTheDocument();
+  });
+
   it("creates, updates, authenticates, and suspends an employee account", async () => {
     render(<ModulePage role="manager" module="people"/>);
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));
@@ -259,7 +269,7 @@ describe("People and access", () => {
     expect(within(createDialog).queryByLabelText("Email address")).not.toBeInTheDocument();
     fireEvent.change(within(createDialog).getByLabelText("Property"), { target: { value: "Ottawa Airport" } });
     fireEvent.change(within(createDialog).getByLabelText("Department"), { target: { value: "housekeeping" } });
-    fireEvent.change(within(createDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Supervisor" } });
+    fireEvent.change(within(createDialog).getByLabelText("Position"), { target: { value: "Housekeeping Supervisor" } });
     fireEvent.change(within(createDialog).getByLabelText(/^Temporary password/), { target: { value: "temporary-pass" } });
     fireEvent.click(within(createDialog).getByRole("button", { name: "Create user" }));
     await act(async () => {});
@@ -271,7 +281,7 @@ describe("People and access", () => {
 
     fireEvent.click(within(employeeRow!).getByRole("button", { name: "Edit user" }));
     const editDialog = screen.getByRole("dialog");
-    fireEvent.change(within(editDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Attendant" } });
+    fireEvent.change(within(editDialog).getByLabelText("Position"), { target: { value: "Housekeeping Attendant" } });
     fireEvent.change(within(editDialog).getByLabelText(/^Reset password/), { target: { value: "manager-reset-pass" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Save changes" }));
     await act(async () => {});
