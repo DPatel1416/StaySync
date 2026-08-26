@@ -209,6 +209,21 @@ describe("Account settings", () => {
     expect(screen.getByDisplayValue("alex.morgan")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
     expect(screen.getByRole("status")).toHaveTextContent("Profile saved");
+    expect(screen.queryByLabelText("Email address")).not.toBeInTheDocument();
+  });
+
+  it("lets a staff member change their own password using the current password", () => {
+    const original = { ...getUserAccounts().find((account) => account.username === "alex.morgan")! };
+    saveDemoEmployeeSession(original.username);
+    const settings = render(<ModulePage role="front-desk" module="settings"/>);
+    fireEvent.change(screen.getByLabelText("Current password"), { target: { value: original.password } });
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "alex-new-password" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "alex-new-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    expect(authenticateDemoEmployee("alex.morgan", "alex-new-password")?.workspace).toBe("front-desk");
+    settings.unmount();
+    act(() => updateUserAccount(original));
+    clearDemoEmployeeSession();
   });
 
   it("lets the General Manager transfer the primary account profile and password", () => {
@@ -241,7 +256,8 @@ describe("People and access", () => {
     const createDialog = screen.getByRole("dialog");
     fireEvent.change(within(createDialog).getByLabelText("Full name"), { target: { value: "Morgan Hayes" } });
     fireEvent.change(within(createDialog).getByLabelText("Username"), { target: { value: "morgan.hayes" } });
-    fireEvent.change(within(createDialog).getByLabelText("Email address"), { target: { value: "morgan.hayes@northstar.example" } });
+    expect(within(createDialog).queryByLabelText("Email address")).not.toBeInTheDocument();
+    fireEvent.change(within(createDialog).getByLabelText("Property"), { target: { value: "Ottawa Airport" } });
     fireEvent.change(within(createDialog).getByLabelText("Department"), { target: { value: "housekeeping" } });
     fireEvent.change(within(createDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Supervisor" } });
     fireEvent.change(within(createDialog).getByLabelText(/^Temporary password/), { target: { value: "temporary-pass" } });
@@ -249,21 +265,23 @@ describe("People and access", () => {
 
     const employeeRow = screen.getByText("Morgan Hayes").closest("article");
     expect(employeeRow).not.toBeNull();
-    expect(within(employeeRow!).getByText(/Housekeeping Supervisor/)).toBeInTheDocument();
+    expect(within(employeeRow!).getByText("Housekeeping Supervisor · Ottawa Airport")).toBeInTheDocument();
     expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")).toEqual(expect.objectContaining({ workspace: "housekeeping", isSupervisor: true }));
 
     fireEvent.click(within(employeeRow!).getByRole("button", { name: "Edit user" }));
     const editDialog = screen.getByRole("dialog");
     fireEvent.change(within(editDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Attendant" } });
+    fireEvent.change(within(editDialog).getByLabelText(/^Reset password/), { target: { value: "manager-reset-pass" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Save changes" }));
-    expect(within(screen.getByText("Morgan Hayes").closest("article")!).getByText(/Housekeeping Attendant/)).toBeInTheDocument();
-    expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")?.isSupervisor).toBe(false);
+    expect(within(screen.getByText("Morgan Hayes").closest("article")!).getByText("Housekeeping Attendant · Ottawa Airport")).toBeInTheDocument();
+    expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")).toBeNull();
+    expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")?.isSupervisor).toBe(false);
 
     const updatedRow = screen.getByText("Morgan Hayes").closest("article")!;
     fireEvent.click(within(updatedRow).getByRole("button", { name: "Delete" }));
     fireEvent.click(within(updatedRow).getByRole("button", { name: "Confirm delete" }));
     expect(screen.queryByText("Morgan Hayes")).not.toBeInTheDocument();
-    expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")).toBeNull();
+    expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")).toBeNull();
   });
 
   it("protects the primary General Manager account from deletion", () => {

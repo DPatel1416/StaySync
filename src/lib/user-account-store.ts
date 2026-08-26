@@ -8,7 +8,7 @@ export type UserAccount = {
   id: string;
   name: string;
   username: string;
-  email: string;
+  email?: string;
   password: string;
   workspace: WorkspaceRole;
   title: string;
@@ -34,13 +34,13 @@ export const departmentLabels: Record<WorkspaceRole, string> = {
 
 const seedAccounts: UserAccount[] = [
   { id: "user-maya", name: "Maya Chen", username: "maya.chen", email: "maya.chen@northstar.example", password: "staysync-demo", workspace: "manager", title: "General Manager", isSupervisor: true, property: "Ottawa Downtown", status: "Active", primaryAccount: true },
-  { id: "user-alex", name: "Alex Morgan", username: "alex.morgan", email: "alex.morgan@northstar.example", password: "staysync-demo", workspace: "front-desk", title: "Front Desk Agent", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
-  { id: "user-sofia", name: "Sofia Martin", username: "sofia.martin", email: "sofia.martin@northstar.example", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Supervisor", isSupervisor: true, property: "Ottawa Downtown", status: "Active" },
-  { id: "user-priya", name: "Priya Shah", username: "priya.shah", email: "priya.shah@northstar.example", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Attendant", isSupervisor: false, property: "Ottawa Downtown", status: "Temporary password" },
-  { id: "user-elena", name: "Elena Ruiz", username: "elena.ruiz", email: "elena.ruiz@northstar.example", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Attendant", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
-  { id: "user-sam", name: "Sam Rivera", username: "sam.rivera", email: "sam.rivera@northstar.example", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Supervisor", isSupervisor: true, property: "Ottawa Downtown", status: "Active" },
-  { id: "user-jordan", name: "Jordan Lee", username: "jordan.lee", email: "jordan.lee@northstar.example", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
-  { id: "user-noah", name: "Noah Wilson", username: "noah.wilson", email: "noah.wilson@northstar.example", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-alex", name: "Alex Morgan", username: "alex.morgan", password: "staysync-demo", workspace: "front-desk", title: "Front Desk Agent", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-sofia", name: "Sofia Martin", username: "sofia.martin", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Supervisor", isSupervisor: true, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-priya", name: "Priya Shah", username: "priya.shah", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Attendant", isSupervisor: false, property: "Ottawa Downtown", status: "Temporary password" },
+  { id: "user-elena", name: "Elena Ruiz", username: "elena.ruiz", password: "staysync-demo", workspace: "housekeeping", title: "Housekeeping Attendant", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-sam", name: "Sam Rivera", username: "sam.rivera", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Supervisor", isSupervisor: true, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-jordan", name: "Jordan Lee", username: "jordan.lee", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
+  { id: "user-noah", name: "Noah Wilson", username: "noah.wilson", password: "staysync-demo", workspace: "maintenance", title: "Maintenance Technician", isSupervisor: false, property: "Ottawa Downtown", status: "Active" },
 ];
 
 const storageKey = "staysync-user-accounts";

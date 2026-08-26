@@ -30,9 +30,13 @@ export function clearDemoEmployeeSession() {
   if (typeof window !== "undefined") window.localStorage.removeItem(sessionKey);
 }
 
+export function getSavedDemoEmployeeUsername() {
+  return typeof window === "undefined" ? "" : window.localStorage.getItem(sessionKey) ?? "";
+}
+
 export function getDemoEmployeeSession(workspace: WorkspaceRole) {
   if (typeof window === "undefined") return null;
-  const username = window.localStorage.getItem(sessionKey) ?? "";
+  const username = getSavedDemoEmployeeUsername();
   const employee = getUserAccountByUsername(username);
   return employee?.workspace === workspace ? employee : null;
 }
