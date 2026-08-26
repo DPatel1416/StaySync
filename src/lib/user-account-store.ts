@@ -14,6 +14,7 @@ export type UserAccount = {
   title: string;
   isSupervisor: boolean;
   property: string;
+  propertyId?: string;
   status: "Active" | "Temporary password";
   primaryAccount?: boolean;
 };

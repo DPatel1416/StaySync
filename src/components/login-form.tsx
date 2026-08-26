@@ -17,7 +17,7 @@ export function LoginForm({ onModeChange }: { onModeChange?: (mode: Mode) => voi
   const [loading, setLoading] = useState(false);
   const [caps, setCaps] = useState(false);
   const [error, setError] = useState("");
-  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+  const demoMode = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   function chooseMode(nextMode: Mode) {
     setMode(nextMode); setHolderAction("signin"); setError(""); onModeChange?.(nextMode);

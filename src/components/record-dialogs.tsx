@@ -17,19 +17,26 @@ type DialogFrameProps = {
   icon?: React.ElementType;
   triggerVariant?: "secondary";
   children: React.ReactNode;
-  onSubmit: (data: FormData) => void;
+  onSubmit: (data: FormData) => void | Promise<void>;
 };
 
 function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpen = false, icon: Icon = Plus, triggerVariant, children, onSubmit }: DialogFrameProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const closeTimer = useRef<number | null>(null);
   useEffect(() => () => { if (closeTimer.current !== null) window.clearTimeout(closeTimer.current); }, []);
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit(new FormData(event.currentTarget));
-    setSaved(true);
-    closeTimer.current = window.setTimeout(() => { setSaved(false); setOpen(false); closeTimer.current = null; }, 500);
+    setSubmitting(true); setSubmitError("");
+    try {
+      await onSubmit(new FormData(event.currentTarget));
+      setSaved(true);
+      closeTimer.current = window.setTimeout(() => { setSaved(false); setOpen(false); closeTimer.current = null; }, 500);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "The record could not be saved. Please try again.");
+    } finally { setSubmitting(false); }
   }
   return <Dialog.Root open={open} onOpenChange={setOpen}>
     <Dialog.Trigger asChild><Button variant={triggerVariant}><Icon className="size-4"/>{triggerLabel}</Button></Dialog.Trigger>
@@ -37,7 +44,7 @@ function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpe
       <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/>
       <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4"><div><Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">{title}</Dialog.Title><Dialog.Description className="mt-1 text-sm leading-5 text-slate-500">{description}</Dialog.Description></div><Dialog.Close className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div>
-        <form onSubmit={submit} className="mt-6 space-y-4">{children}<div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit">{saved ? <><Check className="size-4"/>Saved</> : submitLabel}</Button></div></form>
+        <form onSubmit={submit} className="mt-6 space-y-4">{children}{submitError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p>}<div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit" disabled={submitting}>{saved ? <><Check className="size-4"/>Saved</> : submitting ? "Saving…" : submitLabel}</Button></div></form>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>;
@@ -162,7 +169,7 @@ export function QualityScoreDialog({ current, onCreate }: { current?: QualitySco
 }
 
 export type PropertyDraft = { name: string; code: string; address: string; city: string; region: string; postalCode: string; timezone: string; rooms: number; status: string };
-export function PropertyDialog({ onCreate }: { onCreate: (draft: PropertyDraft) => void }) {
+export function PropertyDialog({ onCreate }: { onCreate: (draft: PropertyDraft) => void | Promise<void> }) {
   return <DialogFrame title="Add property" description="Set up the hotel’s identity, location, operating timezone, and room inventory." triggerLabel="Add property" submitLabel="Create property" onSubmit={(data) => onCreate({ name: String(data.get("name")), code: String(data.get("code")).toUpperCase(), address: String(data.get("address")), city: String(data.get("city")), region: String(data.get("region")), postalCode: String(data.get("postalCode")), timezone: String(data.get("timezone")), rooms: Number(data.get("rooms")), status: String(data.get("status")) })}>
     <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><label><Label required>Property name</Label><input name="name" required className={inputClass} placeholder="Ottawa West"/></label><label><Label required>Property code</Label><input name="code" required maxLength={12} className={inputClass} placeholder="OTT-WEST"/></label></div>
     <label className="block"><Label required>Street address</Label><input name="address" required autoComplete="street-address" className={inputClass} placeholder="100 Example Street"/></label>

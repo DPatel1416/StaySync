@@ -250,7 +250,7 @@ describe("Account settings", () => {
 });
 
 describe("People and access", () => {
-  it("creates, updates, authenticates, and deletes an employee account", () => {
+  it("creates, updates, authenticates, and suspends an employee account", async () => {
     render(<ModulePage role="manager" module="people"/>);
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));
     const createDialog = screen.getByRole("dialog");
@@ -262,6 +262,7 @@ describe("People and access", () => {
     fireEvent.change(within(createDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Supervisor" } });
     fireEvent.change(within(createDialog).getByLabelText(/^Temporary password/), { target: { value: "temporary-pass" } });
     fireEvent.click(within(createDialog).getByRole("button", { name: "Create user" }));
+    await act(async () => {});
 
     const employeeRow = screen.getByText("Morgan Hayes").closest("article");
     expect(employeeRow).not.toBeNull();
@@ -273,13 +274,15 @@ describe("People and access", () => {
     fireEvent.change(within(editDialog).getByLabelText("Job title"), { target: { value: "Housekeeping Attendant" } });
     fireEvent.change(within(editDialog).getByLabelText(/^Reset password/), { target: { value: "manager-reset-pass" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Save changes" }));
+    await act(async () => {});
     expect(within(screen.getByText("Morgan Hayes").closest("article")!).getByText("Housekeeping Attendant · Ottawa Airport")).toBeInTheDocument();
     expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")).toBeNull();
     expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")?.isSupervisor).toBe(false);
 
     const updatedRow = screen.getByText("Morgan Hayes").closest("article")!;
-    fireEvent.click(within(updatedRow).getByRole("button", { name: "Delete" }));
-    fireEvent.click(within(updatedRow).getByRole("button", { name: "Confirm delete" }));
+    fireEvent.click(within(updatedRow).getByRole("button", { name: "Suspend" }));
+    fireEvent.click(within(updatedRow).getByRole("button", { name: "Confirm suspend" }));
+    await act(async () => {});
     expect(screen.queryByText("Morgan Hayes")).not.toBeInTheDocument();
     expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")).toBeNull();
   });

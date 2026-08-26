@@ -5,7 +5,7 @@ StaySync is a hotel communication and operations platform for service requests, 
 ## Local development
 
 1. Install dependencies with `npm install`.
-2. Copy `.env.example` to `.env.local` and add Supabase credentials. Keep `NEXT_PUBLIC_DEMO_MODE=true` to explore the seeded product UI without a live project.
+2. Copy `.env.example` to `.env.local` and add Supabase credentials. Keep `NEXT_PUBLIC_DEMO_MODE=false` for normal development. The `true` setting is only for isolated local fixture testing and is ignored by production builds.
 3. Start the app with `npm run dev`.
 4. Open `http://localhost:3000` and use a demo login:
 
@@ -18,7 +18,7 @@ StaySync is a hotel communication and operations platform for service requests, 
    - Manager: `maya.chen` / `staysync-demo`
    - Account Holder: `owner@northstar.demo` / `staysync-demo`
 
-The login currently enters a deterministic demo workspace when demo mode is enabled. The production employee endpoint is implemented at `/api/auth/employee` and resolves usernames server-side, so employees are never asked for an email or property code.
+When local demo mode is explicitly enabled, login enters a deterministic fixture workspace. Production always requires Supabase Auth, regardless of the public demo flag. The employee endpoint resolves usernames server-side, so employees are never asked for an email or property code.
 
 ## Supabase
 
