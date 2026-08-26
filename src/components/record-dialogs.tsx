@@ -15,11 +15,12 @@ type DialogFrameProps = {
   submitLabel: string;
   defaultOpen?: boolean;
   icon?: React.ElementType;
+  triggerVariant?: "secondary";
   children: React.ReactNode;
   onSubmit: (data: FormData) => void;
 };
 
-function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpen = false, icon: Icon = Plus, children, onSubmit }: DialogFrameProps) {
+function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpen = false, icon: Icon = Plus, triggerVariant, children, onSubmit }: DialogFrameProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [saved, setSaved] = useState(false);
   const closeTimer = useRef<number | null>(null);
@@ -31,7 +32,7 @@ function DialogFrame({ title, description, triggerLabel, submitLabel, defaultOpe
     closeTimer.current = window.setTimeout(() => { setSaved(false); setOpen(false); closeTimer.current = null; }, 500);
   }
   return <Dialog.Root open={open} onOpenChange={setOpen}>
-    <Dialog.Trigger asChild><Button><Icon className="size-4"/>{triggerLabel}</Button></Dialog.Trigger>
+    <Dialog.Trigger asChild><Button variant={triggerVariant}><Icon className="size-4"/>{triggerLabel}</Button></Dialog.Trigger>
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/>
       <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
@@ -148,14 +149,15 @@ export function ManagementIncidentDialog({ defaultOpen, onCreate }: { defaultOpe
 }
 
 export type QualityScoreDraft = { property: string; department: string; score: number; target: number; reviewDate: string; reviewType: string; reviewer: string; comments: string; followUp: boolean };
-export function QualityScoreDialog({ onCreate }: { onCreate: (draft: QualityScoreDraft) => void }) {
-  return <DialogFrame title="Add department quality review" description="Record a completed inspection or audit against the property’s quality target." triggerLabel="Add quality score" submitLabel="Save review" onSubmit={(data) => onCreate({ property: String(data.get("property")), department: String(data.get("department")), score: Number(data.get("score")), target: Number(data.get("target")), reviewDate: String(data.get("reviewDate")), reviewType: String(data.get("reviewType")), reviewer: String(data.get("reviewer")), comments: String(data.get("comments")), followUp: data.get("followUp") === "on" })}>
-    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Property</Label><select name="property" required defaultValue="Ottawa Downtown" className={inputClass}><option>Ottawa Downtown</option><option>Ottawa Airport</option></select></label><label><Label required>Department</Label><select name="department" required defaultValue="" className={inputClass}><option value="" disabled>Select department</option><option>Front Desk</option><option>Housekeeping</option><option>Maintenance</option><option>Food & Beverage</option><option>Security</option></select></label></div>
-    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Score (%)</Label><input name="score" type="number" min="0" max="100" required className={inputClass} placeholder="94"/></label><label><Label required>Target (%)</Label><input name="target" type="number" min="0" max="100" required defaultValue="90" className={inputClass}/></label></div>
-    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Review date</Label><input name="reviewDate" type="date" required className={inputClass}/></label><label><Label required>Review type</Label><select name="reviewType" required defaultValue="Quality inspection" className={inputClass}><option>Quality inspection</option><option>Brand review</option><option>Internal audit</option><option>Guest experience review</option><option>Safety inspection</option></select></label></div>
-    <label><Label required>Reviewed by</Label><input name="reviewer" required defaultValue="General Manager" className={inputClass}/></label>
+export function QualityScoreDialog({ current, onCreate }: { current?: QualityScoreDraft; onCreate: (draft: QualityScoreDraft) => void }) {
+  return <DialogFrame title={current ? `Update ${current.department} score` : "Add department quality review"} description={current ? `The current score is ${current.score}%. Update this same department record with the latest completed review.` : "Add a department that does not yet have a current quality score."} triggerLabel={current ? "Update score" : "Add quality score"} submitLabel={current ? "Update current score" : "Save initial score"} triggerVariant={current ? "secondary" : undefined} onSubmit={(data) => onCreate({ property: String(data.get("property")), department: String(data.get("department")), score: Number(data.get("score")), target: Number(data.get("target")), reviewDate: String(data.get("reviewDate")), reviewType: String(data.get("reviewType")), reviewer: String(data.get("reviewer")), comments: String(data.get("comments")), followUp: data.get("followUp") === "on" })}>
+    {current && <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"><strong>Current score: {current.score}%</strong><span className="mt-1 block text-xs text-sky-800">Saving replaces the current score shown for this department.</span></div>}
+    <div className="grid gap-4 sm:grid-cols-2">{current ? <><label><Label>Property</Label><input name="property" value={current.property} readOnly className={`${inputClass} bg-slate-50 text-slate-500`}/></label><label><Label>Department</Label><input name="department" value={current.department} readOnly className={`${inputClass} bg-slate-50 text-slate-500`}/></label></> : <><label><Label required>Property</Label><select name="property" required defaultValue="Ottawa Downtown" className={inputClass}><option>Ottawa Downtown</option><option>Ottawa Airport</option></select></label><label><Label required>Department</Label><select name="department" required defaultValue="" className={inputClass}><option value="" disabled>Select department</option><option>Front Desk</option><option>Housekeeping</option><option>Maintenance</option><option>Food & Beverage</option><option>Security</option></select></label></>}</div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>{current ? "Updated score (%)" : "Initial score (%)"}</Label><input name="score" type="number" min="0" max="100" required defaultValue={current?.score} className={inputClass} placeholder="94"/></label><label><Label required>Target (%)</Label><input name="target" type="number" min="0" max="100" required defaultValue={current?.target ?? 90} className={inputClass}/></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><Label required>Review date</Label><input name="reviewDate" type="date" required className={inputClass}/></label><label><Label required>Review type</Label><select name="reviewType" required defaultValue={current?.reviewType ?? "Quality inspection"} className={inputClass}><option>Quality inspection</option><option>Brand review</option><option>Internal audit</option><option>Guest experience review</option><option>Safety inspection</option></select></label></div>
+    <label><Label required>Reviewed by</Label><input name="reviewer" required defaultValue={current?.reviewer ?? "General Manager"} className={inputClass}/></label>
     <label className="block"><Label>Comments and corrective actions</Label><textarea name="comments" rows={3} className={textareaClass} placeholder="Note findings, strengths, and required follow-up."/></label>
-    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="followUp" type="checkbox" className="size-4 rounded border-slate-300 text-brand"/>Corrective follow-up is required</label>
+    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-600"><input name="followUp" type="checkbox" defaultChecked={current?.followUp} className="size-4 rounded border-slate-300 text-brand"/>Corrective follow-up is required</label>
   </DialogFrame>;
 }
 

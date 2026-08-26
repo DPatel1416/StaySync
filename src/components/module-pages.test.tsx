@@ -318,14 +318,31 @@ describe("General Manager record creation", () => {
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/^Property/), { target: { value: "Ottawa Airport" } });
     fireEvent.change(within(dialog).getByLabelText(/^Department/), { target: { value: "Housekeeping" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Score/), { target: { value: "88" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Initial score/), { target: { value: "88" } });
     fireEvent.change(within(dialog).getByLabelText(/^Review date/), { target: { value: "2026-08-26" } });
     fireEvent.click(within(dialog).getByLabelText("Corrective follow-up is required"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save review" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save initial score" }));
     const scoreCard = screen.getByText("88%").closest("section");
     expect(scoreCard).not.toBeNull();
     expect(within(scoreCard!).getByText("Ottawa Airport")).toBeInTheDocument();
     expect(within(scoreCard!).getByText("Follow-up required")).toBeInTheDocument();
+  });
+
+  it("updates an existing department from its current score", () => {
+    render(<ModulePage role="manager" module="quality-scores"/>);
+    const currentCard = screen.getByText("94%").closest("section");
+    expect(currentCard).not.toBeNull();
+    fireEvent.click(within(currentCard!).getByRole("button", { name: "Update score" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Current score: 94%")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/^Updated score/)).toHaveValue(94);
+    fireEvent.change(within(dialog).getByLabelText(/^Updated score/), { target: { value: "97" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Review date/), { target: { value: "2026-08-26" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Update current score" }));
+    const updatedCard = screen.getByText("97%").closest("section");
+    expect(updatedCard).not.toBeNull();
+    expect(within(updatedCard!).getByText("Front Desk")).toBeInTheDocument();
+    expect(within(updatedCard!).queryByText("94%")).not.toBeInTheDocument();
   });
 
   it("creates a management incident with severity and follow-up ownership", () => {
