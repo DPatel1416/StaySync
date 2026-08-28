@@ -339,6 +339,8 @@ describe("General Manager record creation", () => {
     expect(scoreCard).not.toBeNull();
     expect(within(scoreCard!).getByText("Ottawa Airport")).toBeInTheDocument();
     expect(within(scoreCard!).getByText("Follow-up required")).toBeInTheDocument();
+    expect(within(scoreCard!).queryByText(/previous score/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Score history" })).not.toBeInTheDocument();
   });
 
   it("updates an existing department from its current score", () => {
@@ -356,6 +358,7 @@ describe("General Manager record creation", () => {
     expect(updatedCard).not.toBeNull();
     expect(within(updatedCard!).getByText("Front Desk")).toBeInTheDocument();
     expect(within(updatedCard!).queryByText("94%")).not.toBeInTheDocument();
+    expect(within(updatedCard!).getByText("Up 3 points from previous score")).toBeInTheDocument();
   });
 
   it("creates a management incident with severity and follow-up ownership", () => {

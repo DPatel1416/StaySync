@@ -52,6 +52,7 @@ describe("dynamic room-change summaries", () => {
     expect(screen.getByText("Room 518 · Early checkout")).toBeInTheDocument();
     expect(screen.queryByText("Room 412 · Late checkout")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Housekeeping quality score 91 percent")).toBeInTheDocument();
+    expect(screen.getByText("Down 2 from previous")).toBeInTheDocument();
     expect(screen.queryByText("Request Support")).not.toBeInTheDocument();
     clearDemoEmployeeSession();
   });

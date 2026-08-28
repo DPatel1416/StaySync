@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Archive, ArrowDownToLine, BellRing, CalendarDays, Check, ChevronDown, Download, FileText, Filter, MessageSquare, Paperclip, Pin, Plus, Printer, Search, Send, SlidersHorizontal, X } from "lucide-react";
+import { Archive, ArrowDown, ArrowDownToLine, ArrowUp, BellRing, CalendarDays, Check, ChevronDown, Download, FileText, Filter, Minus, MessageSquare, Paperclip, Pin, Plus, Printer, Search, Send, SlidersHorizontal, X } from "lucide-react";
 import { latestLogs, serviceRequests } from "@/lib/demo-data";
 import { workspaceNames } from "@/lib/demo-data";
 import type { WorkspaceRole } from "@/lib/permissions";
@@ -10,7 +10,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
 import { ListRows, PageHeading } from "./dashboard/shared";
-import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, ManagementIncidentDialog, OperationLogDialog, PreventiveMaintenanceDialog, PropertyDialog, QualityScoreDialog, ServiceRequestDialog, WorkOrderDialog, type PreventiveMaintenanceDraft, type WorkOrderDraft } from "./record-dialogs";
+import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, ManagementIncidentDialog, OperationLogDialog, PreventiveMaintenanceDialog, PropertyDialog, QualityScoreDialog, ServiceRequestDialog, WorkOrderDialog, type PreventiveMaintenanceDraft, type QualityScoreDraft, type WorkOrderDraft } from "./record-dialogs";
 import { canModifyOperationLog, IncidentEditor, LostFoundEditor, OperationLogEditor, ServiceRequestEditor, WorkOrderEditor, type EditableLog, type EditableOperationalRecord, type EditableRequest } from "./record-update-dialogs";
 import { addRoomUpdate, isInformationalRoomChange, markRoomClearedByMaintenance, updateRoomUpdateState, useRoomUpdates } from "@/lib/room-update-store";
 import { addServiceRequest, deleteServiceRequest, updateServiceRequest, useServiceRequests } from "@/lib/service-request-store";
@@ -292,16 +292,17 @@ function MaintenanceReports() {
 function ReportMetric({ label, value, note }: { label: string; value: string; note: string }) { return <Card className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></Card>; }
 
 function QualityScores() {
-  const [scores, setScores] = useState([
-    { id: "quality-fd", department: "Front Desk", property: "Ottawa Downtown", score: 94, target: 92, reviewDate: "2026-07-15", reviewType: "Brand review", reviewer: "General Manager", comments: "", followUp: false },
-    { id: "quality-hk", department: "Housekeeping", property: "Ottawa Downtown", score: 91, target: 93, reviewDate: "2026-07-10", reviewType: "Quality inspection", reviewer: "General Manager", comments: "", followUp: true },
-    { id: "quality-mt", department: "Maintenance", property: "Ottawa Downtown", score: 96, target: 90, reviewDate: "2026-07-12", reviewType: "Internal audit", reviewer: "General Manager", comments: "", followUp: false },
+  type CurrentScore = QualityScoreDraft & { id: string; previousScore?: number };
+  const [scores, setScores] = useState<CurrentScore[]>([
+    { id: "quality-fd", department: "Front Desk", property: "Ottawa Downtown", score: 94, previousScore: 92, target: 92, reviewDate: "2026-07-15", reviewType: "Brand review", reviewer: "General Manager", comments: "", followUp: false },
+    { id: "quality-hk", department: "Housekeeping", property: "Ottawa Downtown", score: 91, previousScore: 93, target: 93, reviewDate: "2026-07-10", reviewType: "Quality inspection", reviewer: "General Manager", comments: "", followUp: true },
+    { id: "quality-mt", department: "Maintenance", property: "Ottawa Downtown", score: 96, previousScore: 94, target: 90, reviewDate: "2026-07-12", reviewType: "Internal audit", reviewer: "General Manager", comments: "", followUp: false },
   ]);
-  function addOrUpdateScore(draft: Omit<(typeof scores)[number], "id">) {
+  function addOrUpdateScore(draft: QualityScoreDraft) {
     const existing = scores.find((score) => score.property === draft.property && score.department === draft.department);
-    setScores(existing ? scores.map((score) => score.id === existing.id ? { id: existing.id, ...draft } : score) : [{ id: `quality-${Date.now()}`, ...draft }, ...scores]);
+    setScores(existing ? scores.map((score) => score.id === existing.id ? { id: existing.id, previousScore: score.score, ...draft } : score) : [{ id: `quality-${Date.now()}`, ...draft }, ...scores]);
   }
-  return <div className="space-y-6"><PageHeading eyebrow="Management" title="Department quality scores" description="Maintain one current score for each property department and update it after each completed review." actions={<QualityScoreDialog onCreate={addOrUpdateScore}/>}/><div className="grid gap-4 md:grid-cols-3">{scores.map((score) => <Card key={score.id} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{score.department}</p><p className="mt-1 text-xs text-slate-400">{score.property}</p></div>{score.followUp && <Badge tone="warning">Follow-up required</Badge>}</div><div className="mt-5 flex items-end gap-2"><p className="text-4xl font-bold tracking-tight">{score.score}%</p><p className="mb-1 text-xs text-slate-400">Target {score.target}%</p></div><div className="mt-4 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full ${score.score >= score.target ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${score.score}%` }}/></div><p className="mt-4 text-xs text-slate-500">{score.reviewType} · {score.reviewDate} · {score.reviewer}</p><div className="mt-4 [&>button]:w-full"><QualityScoreDialog current={score} onCreate={(draft) => setScores(scores.map((item) => item.id === score.id ? { id: score.id, ...draft } : item))}/></div></Card>)}</div><Card><CardHeader title="Score history" description="Latest completed reviews across properties and departments"/><div className="p-6 text-sm text-slate-500">Use Update score on a department card to replace its current result after a completed review.</div></Card></div>;
+  return <div className="space-y-6"><PageHeading eyebrow="Management" title="Department quality scores" description="Share each department’s current score and latest movement to keep teams informed and motivated." actions={<QualityScoreDialog onCreate={addOrUpdateScore}/>}/><div className="grid gap-4 md:grid-cols-3">{scores.map((score) => { const change = score.previousScore === undefined ? null : score.score - score.previousScore; return <Card key={score.id} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{score.department}</p><p className="mt-1 text-xs text-slate-400">{score.property}</p></div>{score.followUp && <Badge tone="warning">Follow-up required</Badge>}</div><div className="mt-5 flex items-end gap-2"><p className="text-4xl font-bold tracking-tight">{score.score}%</p><p className="mb-1 text-xs text-slate-400">Target {score.target}%</p></div>{change !== null && <div className={`mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${change > 0 ? "bg-emerald-50 text-emerald-700" : change < 0 ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{change > 0 ? <ArrowUp className="size-3.5"/> : change < 0 ? <ArrowDown className="size-3.5"/> : <Minus className="size-3.5"/>}{change > 0 ? `Up ${change} ${change === 1 ? "point" : "points"} from previous score` : change < 0 ? `Down ${Math.abs(change)} ${change === -1 ? "point" : "points"} from previous score` : "No change from previous score"}</div>}<div className="mt-4 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full ${score.score >= score.target ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${score.score}%` }}/></div><p className="mt-4 text-xs text-slate-500">Updated {score.reviewDate}</p><div className="mt-4 [&>button]:w-full"><QualityScoreDialog current={score} onCreate={(draft) => setScores(scores.map((item) => item.id === score.id ? { id: score.id, previousScore: item.score, ...draft } : item))}/></div></Card>; })}</div></div>;
 }
 
 function ManagementIncidentsPage({ autoOpen = false }: { autoOpen?: boolean }) {
