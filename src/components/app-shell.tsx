@@ -11,6 +11,7 @@ import type { Permission, WorkspaceRole } from "@/lib/permissions";
 import { markDepartmentNotificationRead, useDepartmentNotifications } from "@/lib/notification-store";
 import { clearDemoEmployeeSession, getDemoEmployeeSession } from "@/lib/demo-auth";
 import { useUserAccounts } from "@/lib/user-account-store";
+import { addDepartment, getDepartmentLabel, useDepartments } from "@/lib/department-store";
 import type { AuthenticatedViewer } from "@/lib/auth/viewer";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 
@@ -19,10 +20,10 @@ const nav = {
     ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["Room Updates", "room-updates", CircleGauge], ["Service Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Lost & Found", "lost-found", PackageSearch], ["Payment Issues", "payment-issues", FileChartColumn],
   ],
   housekeeping: [
-    ["Overview", "", Home], ["Room Updates", "room-updates", CircleGauge], ["Assigned Rooms", "assigned-rooms", ClipboardList], ["Operations Log", "operations-log", BookOpenText], ["Service Requests", "service-requests", Wrench],
+    ["Overview", "", Home], ["Room Updates", "room-updates", CircleGauge], ["Assigned Rooms", "assigned-rooms", ClipboardList], ["Operations Log", "operations-log", BookOpenText], ["Service Requests", "service-requests", Wrench], ["Incidents", "incidents", ShieldAlert],
   ],
   maintenance: [
-    ["Overview", "", Home], ["Work Orders", "work-orders", Wrench], ["Service Requests", "service-requests", ClipboardList], ["Preventive", "preventive", CircleGauge], ["Maintenance Reports", "maintenance-reports", FileChartColumn], ["Operations Log", "operations-log", BookOpenText],
+    ["Overview", "", Home], ["Work Orders", "work-orders", Wrench], ["Service Requests", "service-requests", ClipboardList], ["Preventive", "preventive", CircleGauge], ["Maintenance Reports", "maintenance-reports", FileChartColumn], ["Operations Log", "operations-log", BookOpenText], ["Incidents", "incidents", ShieldAlert],
   ],
   "food-beverage": [
     ["Operations Log", "operations-log", BookOpenText], ["Incident Reports", "incidents", ShieldAlert],
@@ -30,9 +31,9 @@ const nav = {
   manager: [
     ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["All Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Quality Scores", "quality-scores", Star], ["Reports", "reports", FileChartColumn], ["People", "people", Users], ["Properties", "properties", Building2],
   ],
-} satisfies Record<WorkspaceRole, Array<[string, string, typeof Home]>>;
+} satisfies Record<Exclude<WorkspaceRole, `department-${string}`>, Array<[string, string, typeof Home]>>;
 
-const users: Record<WorkspaceRole, { name: string; title: string; isSupervisor?: boolean }> = {
+const users: Record<Exclude<WorkspaceRole, `department-${string}`>, { name: string; title: string; isSupervisor?: boolean }> = {
   "front-desk": { name: "Alex Morgan", title: "Guest Services Agent" },
   housekeeping: { name: "Sofia Martin", title: "Housekeeping Supervisor", isSupervisor: true },
   maintenance: { name: "Sam Rivera", title: "Maintenance Supervisor", isSupervisor: true },
@@ -52,22 +53,34 @@ const managerNavigationPermissions: Record<string, Permission> = {
 
 export function AppShell({ role, children, viewer = null }: { role: WorkspaceRole; children: React.ReactNode; viewer?: AuthenticatedViewer | null }) {
   const accounts = useUserAccounts();
+  const departments = useDepartments();
+  const departmentName = getDepartmentLabel(role, departments);
   const [open, setOpen] = useState(false);
   const [propertyOpen, setPropertyOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const authorizedProperties = viewer?.properties.length ? viewer.properties.map((item) => item.name) : role === "manager" ? ["Ottawa Downtown", "Ottawa Airport"] : ["Ottawa Downtown"];
   const [property, setProperty] = useState(authorizedProperties[0]);
   const pathname = usePathname();
-  const [user, setUser] = useState(viewer ? { name: viewer.name, title: viewer.title, isSupervisor: viewer.isSupervisor } : users[role]);
+  const fallbackUser = users[role as keyof typeof users] ?? { name: accounts.find((account) => account.workspace === role)?.name ?? "Department team member", title: accounts.find((account) => account.workspace === role)?.title ?? `${departmentName} Team Member` };
+  const [user, setUser] = useState(viewer ? { name: viewer.name, title: viewer.title, isSupervisor: viewer.isSupervisor } : fallbackUser);
   useEffect(() => {
     if (viewer) { setUser({ name: viewer.name, title: viewer.title, isSupervisor: viewer.isSupervisor }); return; }
     const session = getDemoEmployeeSession(role);
     if (session) setUser({ name: session.name, title: session.title, isSupervisor: session.isSupervisor });
   }, [accounts, role, viewer]);
+  useEffect(() => {
+    if (!viewer || role !== "manager") return;
+    fetch("/api/management/departments", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const result = await response.json() as { departments?: Array<{ name: string }> };
+      result.departments?.forEach((department) => addDepartment(department.name));
+    }).catch(() => undefined);
+  }, [role, viewer]);
   const base = `/app/${role}`;
-  const departmentNotifications = useDepartmentNotifications(workspaceNames[role], Boolean(user.isSupervisor));
+  const departmentNotifications = useDepartmentNotifications(departmentName, Boolean(user.isSupervisor), user.name);
   const unreadNotifications = departmentNotifications.filter((notification) => !notification.readAt);
-  const navigationItems = nav[role].filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates") && !(role === "maintenance" && !user.isSupervisor && label === "Maintenance Reports") && !(viewer && role === "manager" && managerNavigationPermissions[label] && !viewer.permissions.includes(managerNavigationPermissions[label])));
+  const baseNavigation: Array<[string, string, typeof Home]> = nav[role as keyof typeof nav] ?? [["Operations Log", "operations-log", BookOpenText], ["Incident Reports", "incidents", ShieldAlert]];
+  const navigationItems = baseNavigation.filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates") && !(role === "maintenance" && !user.isSupervisor && label === "Maintenance Reports") && !(viewer && role === "manager" && managerNavigationPermissions[label] && !viewer.permissions.includes(managerNavigationPermissions[label])));
   const sidebar = <>
     <div className="flex h-[76px] items-center justify-between px-5"><Logo/><button className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="size-5"/></button></div>
     <div className="relative mx-3 mb-4 rounded-xl border border-brand-border bg-brand-soft p-3"><button type="button" onClick={() => setPropertyOpen((current) => !current)} className="flex min-h-11 w-full items-center gap-3 text-left" aria-label={`Current property: ${property}. Open property menu`} aria-expanded={propertyOpen}><span className="grid size-9 place-items-center rounded-lg bg-white text-brand shadow-sm"><Building2 className="size-4"/></span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{property}</span><span className="block text-xs text-slate-500">Northstar Hotels</span></span><ChevronDown className={cn("size-4 text-slate-400 transition-transform", propertyOpen && "rotate-180")}/></button>{propertyOpen && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" role="menu" aria-label="Authorized properties">{authorizedProperties.map((name) => <button key={name} type="button" role="menuitemradio" aria-checked={property === name} onClick={() => { setProperty(name); setPropertyOpen(false); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-50"><span className="min-w-0 flex-1 truncate font-medium">{name}</span>{property === name && <Check className="size-4 text-brand"/>}</button>)}{authorizedProperties.length === 1 && <p className="border-t border-slate-100 px-3 py-2 text-xs leading-5 text-slate-500">This is the only property assigned to your account.</p>}</div>}</div>

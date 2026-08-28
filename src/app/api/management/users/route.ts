@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireManagementPermission, managementError } from "@/lib/auth/management";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { employeeAuthEmail, employeeWorkspaces, prepareEmployeeAccess } from "@/lib/auth/employee-management";
+import { employeeAuthEmail, prepareEmployeeAccess, workspaceFromDepartmentCode } from "@/lib/auth/employee-management";
+import type { WorkspaceRole } from "@/lib/permissions";
 
 const employeeSchema = z.object({
   name: z.string().trim().min(2).max(100),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,49}$/),
   password: z.string().min(8).max(256),
-  workspace: z.enum(employeeWorkspaces),
+  workspace: z.string().regex(/^(front-desk|housekeeping|maintenance|food-beverage|department-[a-z0-9-]+)$/),
   title: z.string().trim().min(2).max(100),
   propertyId: z.string().uuid(),
 });
@@ -26,8 +27,7 @@ export async function GET() {
     departmentIds.length ? admin.from("departments").select("id, code").in("id", departmentIds) : Promise.resolve({ data: [] }),
   ]);
   const propertyById = new Map((properties ?? []).map((property) => [property.id, property.name]));
-  const workspaceByCode: Record<string, string> = { FRONT_DESK: "front-desk", HOUSEKEEPING: "housekeeping", MAINTENANCE: "maintenance", FOOD_BEVERAGE: "food-beverage", MANAGEMENT: "manager" };
-  const departmentById = new Map((departments ?? []).map((department) => [department.id, workspaceByCode[department.code] ?? "front-desk"]));
+  const departmentById = new Map((departments ?? []).map((department) => [department.id, workspaceFromDepartmentCode(department.code)]));
   return NextResponse.json({ users: profiles.map((profile) => ({
     id: profile.id,
     name: profile.display_name,
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   let authUserId: string | undefined;
   try {
-    const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace, parsed.data.title);
+    const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace as WorkspaceRole, parsed.data.title);
     const { data: authUser, error: authError } = await admin.auth.admin.createUser({
       email: employeeAuthEmail(parsed.data.username, access.viewer.organizationId),
       password: parsed.data.password,

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import type { Permission, WorkspaceRole } from "@/lib/permissions";
+import { workspaceFromDepartmentCode } from "./employee-management";
 
 export type ViewerProperty = { id: string; name: string; isDefault: boolean };
 
@@ -16,14 +17,6 @@ export type AuthenticatedViewer = {
   accountKind: "EMPLOYEE" | "ACCOUNT_HOLDER";
   properties: ViewerProperty[];
   permissions: Permission[];
-};
-
-const workspaceByDepartment: Record<string, WorkspaceRole> = {
-  FRONT_DESK: "front-desk",
-  HOUSEKEEPING: "housekeeping",
-  MAINTENANCE: "maintenance",
-  FOOD_BEVERAGE: "food-beverage",
-  MANAGEMENT: "manager",
 };
 
 export function isLocalDemoMode() {
@@ -47,7 +40,7 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
     : { data: null };
   const workspace: WorkspaceRole = profile.account_kind === "ACCOUNT_HOLDER"
     ? "manager"
-    : workspaceByDepartment[department?.code ?? ""] ?? "front-desk";
+    : department?.code ? workspaceFromDepartmentCode(department.code) : "front-desk";
 
   const { data: memberships } = await supabase
     .from("user_properties")

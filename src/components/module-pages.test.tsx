@@ -432,6 +432,37 @@ describe("Operations Log conversations", () => {
     render(<ModulePage role="manager" module="operations-log"/>);
     expect(screen.getByText(/East elevator returned to service/)).toBeInTheDocument();
   });
+
+  it("filters Management's view to a department's internal and shared logs", () => {
+    render(<ModulePage role="manager" module="operations-log"/>);
+    fireEvent.change(screen.getByLabelText("Filter Operations Log by department"), { target: { value: "Maintenance" } });
+    expect(screen.getByText(/East elevator returned to service/)).toBeInTheDocument();
+    expect(screen.getByText(/Room 604 remains out of service/)).toBeInTheDocument();
+    expect(screen.queryByText(/VIP group arriving at 3:00 PM/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Management report builder", () => {
+  it("generates and exports the filtered preview", () => {
+    const createObjectUrl = vi.fn(() => "blob:gm-report");
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    render(<ModulePage role="manager" module="reports"/>);
+    fireEvent.change(screen.getByLabelText("Report type"), { target: { value: "Operations logs" } });
+    fireEvent.change(screen.getByLabelText("Filter by department"), { target: { value: "Maintenance" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+    expect(screen.getByText(/East elevator returned to service/)).toBeInTheDocument();
+    expect(screen.getByText(/Room 604 remains out of service/)).toBeInTheDocument();
+    expect(screen.queryByText(/VIP group arriving at 3:00 PM/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "CSV" }));
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    fireEvent.change(screen.getByLabelText("Report type"), { target: { value: "Preventive maintenance" } });
+    fireEvent.change(screen.getByLabelText("Filter by department"), { target: { value: "Maintenance" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+    expect(screen.getByText(/Inspect ice machine/)).toBeInTheDocument();
+    anchorClick.mockRestore();
+  });
 });
 
 describe("Late checkout communication", () => {

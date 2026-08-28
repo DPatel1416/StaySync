@@ -14,8 +14,9 @@ export type DepartmentNotification = {
   createdBy: string;
   readAt?: number;
   audience?: "DEPARTMENT" | "SUPERVISORS";
+  recipientName?: string;
   tone?: "info" | "warning" | "urgent";
-  kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "SUPPORT" | "INSPECTION" | "ROOM_CLEARANCE";
+  kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "SUPPORT" | "INSPECTION" | "ROOM_CLEARANCE" | "MANAGER_CALL";
 };
 
 let notifications: DepartmentNotification[] = [];
@@ -107,11 +108,11 @@ export function markDepartmentNotificationRead(id: string) {
   notify();
 }
 
-export function useDepartmentNotifications(department: string, isSupervisor = true) {
+export function useDepartmentNotifications(department: string, isSupervisor = true, recipientName?: string) {
   const allNotifications = useSyncExternalStore(
     (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
     () => { hydrate(); return notifications; },
     () => notifications,
   );
-  return allNotifications.filter((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor));
+  return allNotifications.filter((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor) && (!notification.recipientName || notification.recipientName === recipientName));
 }

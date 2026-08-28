@@ -19,21 +19,21 @@ export type UserAccount = {
   primaryAccount?: boolean;
 };
 
-export const departmentTitles: Record<WorkspaceRole, string[]> = {
+export const departmentTitles: Record<WorkspaceRole, string[]> = new Proxy({
   manager: ["General Manager"],
   "front-desk": ["Front Desk Agent", "Front Desk Supervisor"],
   housekeeping: ["Housekeeping Attendant", "Housekeeping Supervisor"],
   maintenance: ["Maintenance Technician", "Maintenance Supervisor"],
   "food-beverage": ["Food & Beverage Team Member"],
-};
+} as Record<WorkspaceRole, string[]>, { get(target, property: string) { return target[property as WorkspaceRole] ?? [`${property.replace(/^department-/, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ")} Team Member`, `${property.replace(/^department-/, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ")} Supervisor`]; } });
 
-export const departmentLabels: Record<WorkspaceRole, string> = {
+export const departmentLabels: Record<WorkspaceRole, string> = new Proxy({
   manager: "Management",
   "front-desk": "Front Desk",
   housekeeping: "Housekeeping",
   maintenance: "Maintenance",
   "food-beverage": "Food & Beverage",
-};
+} as Record<WorkspaceRole, string>, { get(target, property: string) { return target[property as WorkspaceRole] ?? property.replace(/^department-/, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "); } });
 
 const seedAccounts: UserAccount[] = [
   { id: "user-maya", name: "Maya Chen", username: "maya.chen", email: "maya.chen@northstar.example", password: "staysync-demo", workspace: "manager", title: "General Manager", isSupervisor: true, property: "Ottawa Downtown", status: "Active", primaryAccount: true },

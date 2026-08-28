@@ -12,7 +12,8 @@ describe("Front Desk creation workflows", () => {
     expect(screen.getByRole("option", { name: "Department only" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Maintenance" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Housekeeping" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Kitchen" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Kitchen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Food & Beverage" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Management" })).toBeInTheDocument();
   });
 

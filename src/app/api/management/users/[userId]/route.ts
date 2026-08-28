@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireManagementPermission } from "@/lib/auth/management";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { employeeAuthEmail, employeeWorkspaces, prepareEmployeeAccess } from "@/lib/auth/employee-management";
+import { employeeAuthEmail, prepareEmployeeAccess } from "@/lib/auth/employee-management";
+import type { WorkspaceRole } from "@/lib/permissions";
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).max(100),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,49}$/),
   password: z.string().min(8).max(256).optional().or(z.literal("")),
-  workspace: z.enum(employeeWorkspaces),
+  workspace: z.string().regex(/^(front-desk|housekeeping|maintenance|food-beverage|department-[a-z0-9-]+)$/),
   title: z.string().trim().min(2).max(100),
   propertyId: z.string().uuid(),
 });
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   const employee = await editableEmployee(admin, access.viewer.organizationId, userId);
   if (!employee) return NextResponse.json({ error: "That employee account was not found." }, { status: 404 });
   try {
-    const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace, parsed.data.title);
+    const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace as WorkspaceRole, parsed.data.title);
     const authUpdates: { email?: string; password?: string; user_metadata: Record<string, unknown> } = { user_metadata: { display_name: parsed.data.name, account_kind: "EMPLOYEE", requires_password_change: Boolean(parsed.data.password) } };
     if (employee.username !== parsed.data.username) authUpdates.email = employeeAuthEmail(parsed.data.username, access.viewer.organizationId);
     if (parsed.data.password) authUpdates.password = parsed.data.password;

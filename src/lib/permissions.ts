@@ -7,16 +7,17 @@ export const permissions = [
 ] as const;
 
 export type Permission = (typeof permissions)[number];
-export type WorkspaceRole = "front-desk" | "housekeeping" | "maintenance" | "food-beverage" | "manager";
+export type BuiltInWorkspaceRole = "front-desk" | "housekeeping" | "maintenance" | "food-beverage" | "manager";
+export type WorkspaceRole = BuiltInWorkspaceRole | `department-${string}`;
 
-export const rolePermissions: Record<WorkspaceRole, Permission[]> = {
+export const rolePermissions: Record<BuiltInWorkspaceRole, Permission[]> = {
   "front-desk": ["CREATE_SERVICE_REQUEST", "VIEW_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "UPDATE_ROOM_STATUS", "VIEW_ROOM_STATUS", "CREATE_OPERATION_LOG", "VIEW_PAYMENT_ISSUE", "VIEW_LOST_FOUND", "VIEW_DEPARTMENT_SCORE"],
-  housekeeping: ["CREATE_SERVICE_REQUEST", "VIEW_SERVICE_REQUEST", "UPDATE_ROOM_STATUS", "VIEW_ROOM_STATUS", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"],
-  maintenance: ["VIEW_SERVICE_REQUEST", "ASSIGN_SERVICE_REQUEST", "CREATE_OPERATION_LOG", "CREATE_WORK_ORDER", "VIEW_WORK_ORDER", "VIEW_DEPARTMENT_SCORE"],
+  housekeeping: ["CREATE_SERVICE_REQUEST", "VIEW_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "UPDATE_ROOM_STATUS", "VIEW_ROOM_STATUS", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"],
+  maintenance: ["VIEW_SERVICE_REQUEST", "ASSIGN_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG", "CREATE_WORK_ORDER", "VIEW_WORK_ORDER", "VIEW_DEPARTMENT_SCORE"],
   "food-beverage": ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG"],
   manager: [...permissions],
 };
 
 export function can(role: WorkspaceRole, permission: Permission) {
-  return rolePermissions[role].includes(permission);
+  return (rolePermissions[role as BuiltInWorkspaceRole] ?? ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG"]).includes(permission);
 }

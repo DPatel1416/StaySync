@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BellRing, BookPlus, ClipboardPlus, Clock3, FilePlus2, Minus, PackagePlus, Plus, ShieldPlus, Sparkles, UserPlus, Wrench } from "lucide-react";
 import { propertyDailyOperations } from "@/lib/demo-data";
 import { isInformationalRoomChange, useRoomUpdates } from "@/lib/room-update-store";
@@ -16,6 +17,10 @@ import { ListRows, OperationsPreview, PageHeading, QuickActions } from "./shared
 import { useWorkOrders } from "@/lib/work-order-store";
 import type { AuthenticatedViewer } from "@/lib/auth/viewer";
 import type { Permission } from "@/lib/permissions";
+import { getDepartmentLabel, useDepartments } from "@/lib/department-store";
+import { Button } from "../ui/button";
+import { X } from "lucide-react";
+import { useUserAccounts, type UserAccount } from "@/lib/user-account-store";
 
 export function FrontDeskDashboard() {
   const requests = useServiceRequests();
@@ -107,10 +112,38 @@ function MaintenanceTechnicianActions({ locations, onAlert }: { locations: strin
   return <section aria-labelledby="maintenance-technician-actions"><h2 id="maintenance-technician-actions" className="sr-only">Quick actions</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Link href="/app/maintenance/work-orders" className="group flex min-h-[76px] items-center gap-3 rounded-2xl border border-brand bg-brand p-4 text-sm font-semibold text-white shadow-soft"><span className="grid size-10 place-items-center rounded-xl bg-white/15"><Wrench className="size-[19px]"/></span>My Work Orders<ArrowRight className="ml-auto hidden size-4 text-brand-border sm:block"/></Link><div className={`${dialogClass} [&>button]:border-amber-300 [&>button]:bg-amber-50 [&>button]:text-amber-950 [&>button:hover]:bg-amber-100`}><SupervisorAssistanceDialog department="Maintenance" locations={locations} urgent onSend={(draft) => onAlert(draft, true)}/></div><div className={`${dialogClass} [&>button]:border-sky-200 [&>button]:bg-sky-50 [&>button]:text-sky-950 [&>button:hover]:bg-sky-100`}><SupervisorAssistanceDialog department="Maintenance" locations={locations} onSend={(draft) => onAlert(draft, false)}/></div><Link href="/app/maintenance/operations-log?create=1" className="group flex min-h-[76px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-soft"><span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><BookPlus className="size-[19px]"/></span>Add Operations Log<ArrowRight className="ml-auto hidden size-4 text-slate-300 sm:block"/></Link></div></section>;
 }
 
+function SupervisorCallControl({ secure = false }: { secure?: boolean }) {
+  const departments = useDepartments();
+  const localAccounts = useUserAccounts();
+  const [remoteAccounts, setRemoteAccounts] = useState<UserAccount[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("all");
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!secure) return;
+    fetch("/api/management/users", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const result = await response.json() as { users?: UserAccount[] };
+      setRemoteAccounts(result.users ?? []);
+    }).catch(() => undefined);
+  }, [secure]);
+  const supervisors = (remoteAccounts ?? localAccounts).filter((account) => account.workspace !== "manager" && (account.isSupervisor || /supervisor/i.test(account.title)));
+  function callSupervisors(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const targets = target === "all" ? supervisors : supervisors.filter((supervisor) => supervisor.id === target);
+    targets.forEach((supervisor) => sendDepartmentReminder({ department: getDepartmentLabel(supervisor.workspace, departments), recipientName: supervisor.name, title: "Please report to the General Manager’s office", message: note.trim() || "The General Manager is requesting your presence in the office.", serviceRequestId: `manager-call-${Date.now()}-${supervisor.id}`, href: `/app/${supervisor.workspace}`, createdBy: "General Manager", audience: "SUPERVISORS", tone: "urgent", kind: "MANAGER_CALL" }));
+    setMessage(target === "all" ? `Called all ${targets.length} supervisors.` : `Called ${targets[0]?.name ?? "the selected supervisor"}.`);
+    setNote("");
+    setOpen(false);
+  }
+  return <div><Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Trigger asChild><Button type="button"><BellRing className="size-4"/>Call supervisors</Button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/><Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><Dialog.Title className="text-xl font-bold text-slate-950">Call supervisors to the office</Dialog.Title><Dialog.Description className="mt-1 text-sm text-slate-500">Notify one supervisor separately or every supervisor together.</Dialog.Description></div><Dialog.Close className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div><form className="mt-6 space-y-4" onSubmit={callSupervisors}><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Who should be called?</span><select aria-label="Supervisor call recipients" value={target} onChange={(event) => setTarget(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="all">All supervisors together</option>{supervisors.map((supervisor) => <option key={supervisor.id} value={supervisor.id}>{supervisor.name} · {getDepartmentLabel(supervisor.workspace, departments)}</option>)}</select></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Message</span><textarea aria-label="Supervisor call message" value={note} onChange={(event) => setNote(event.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Optional reason or instruction"/></label><div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit" disabled={!supervisors.length}><BellRing className="size-4"/>Send call</Button></div></form></Dialog.Content></Dialog.Portal></Dialog.Root>{message && <span className="mt-2 block text-xs font-semibold text-emerald-700" role="status">{message}</span>}</div>;
+}
+
 export function ManagerDashboard({ viewer = null }: { viewer?: AuthenticatedViewer | null }) {
   const actions: Array<{ label: string; icon: typeof BookPlus; primary?: boolean; href: string; permission: Permission }> = [{ label: "Create Announcement", icon: BookPlus, primary: true, href: "/app/manager/operations-log?create=1", permission: "CREATE_OPERATION_LOG" }, { label: "Assign Task", icon: ClipboardPlus, href: "/app/manager/service-requests?create=1", permission: "ASSIGN_SERVICE_REQUEST" }, { label: "View Reports", icon: FilePlus2, href: "/app/manager/reports", permission: "VIEW_REPORTS" }, { label: "Manage Users", icon: UserPlus, href: "/app/manager/people", permission: "MANAGE_USERS" }];
   const propertyName = viewer?.properties[0]?.name ?? "Ottawa Downtown";
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title={`Good morning, ${viewer?.name.split(" ")[0] ?? "Maya"}`} description={`Property-wide management overview for ${propertyName}.`}/><QuickActions items={actions.filter((action) => !viewer || viewer.permissions.includes(action.permission))}/>
+  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title={`Good morning, ${viewer?.name.split(" ")[0] ?? "Maya"}`} description={`Property-wide management overview for ${propertyName}.`} actions={<SupervisorCallControl secure={Boolean(viewer)}/>}/><QuickActions items={actions.filter((action) => !viewer || viewer.permissions.includes(action.permission))}/>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Summary label="Open issues" value="24" note="Across 4 departments"/><Summary label="Overdue" value="5" note="2 urgent" urgent/><Summary label="Awaiting review" value="3" note="Incidents & payments"/><Summary label="Completed today" value="31" note="Up 12% from Monday" success/></div>
     <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><OperationsPreview base="/app/manager" role="manager"/><Card><CardHeader title="Department quality" description="Latest inspection scores"/><ListRows rows={[{ title: "Maintenance", detail: "Reviewed July 12", badge: "96%", tone: "success" }, { title: "Front Desk", detail: "Reviewed July 15", badge: "94%", tone: "success" }, { title: "Housekeeping", detail: "Reviewed July 10", badge: "91%", tone: "success" }, { title: "Food & Beverage", detail: "Reviewed June 28", badge: "88%", tone: "warning" }]}/></Card></div>
     <Card><CardHeader title="Recent escalations" description="Items that need management visibility"/><ListRows rows={[{ title: "Room 604 · Repeated AC issue", detail: "Third report in 30 days · Maintenance", badge: "Investigate", tone: "urgent" }, { title: "Virtual card discrepancy", detail: "OTA booking · Room 521 · $184.50", badge: "Assigned", tone: "warning" }, { title: "Guest relocation follow-up", detail: "Incident INC-209 · Front Desk", badge: "Review", tone: "info" }]}/></Card></div>;

@@ -19,8 +19,9 @@ const managerModulePermissions: Record<string, Permission> = {
 export default async function Page({ params, searchParams }: { params: Promise<{ workspace: string; module: string }>; searchParams: Promise<{ create?: string; request?: string }> }) {
   const { workspace, module } = await params;
   const query = await searchParams;
-  if (!roles.has(workspace)) notFound();
+  if (!roles.has(workspace) && !workspace.startsWith("department-")) notFound();
   const workspaceRole = workspace as WorkspaceRole;
+  if (workspace.startsWith("department-") && !new Set(["operations-log", "incidents", "settings"]).has(module)) notFound();
   if (allowedModules[workspaceRole] && !allowedModules[workspaceRole]!.has(module)) notFound();
   const viewer = await getAuthenticatedViewer();
   if (viewer && workspace === "manager") {

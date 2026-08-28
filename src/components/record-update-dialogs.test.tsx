@@ -15,7 +15,7 @@ describe("Front Desk record updates", () => {
     render(<ServiceRequestEditor request={{ id: "SR-1046", title: "Meeting room temperature", location: "Maple Room", from: "Events", assigned: "Maintenance", priority: "High", status: "Open", due: "11:00 AM" }} onClose={vi.fn()} onSave={vi.fn()}/>);
     expect(screen.getByLabelText("Status")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
-    expect(screen.getByText(/belongs to another department/i)).toBeInTheDocument();
+    expect(screen.getByText(/read-only for your department/i)).toBeInTheDocument();
   });
 
   it("allows Maintenance to update a request assigned to Maintenance", () => {

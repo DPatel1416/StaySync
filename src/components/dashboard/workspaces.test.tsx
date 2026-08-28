@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { FoodBeverageDashboard, FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard } from "./workspaces";
+import { FoodBeverageDashboard, FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard, ManagerDashboard } from "./workspaces";
 import { updateServiceRequest } from "@/lib/service-request-store";
 import { clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { getDepartmentNotifications } from "@/lib/notification-store";
@@ -20,6 +20,23 @@ describe("Food & Beverage dashboard", () => {
     expect(screen.getByRole("link", { name: /Report Incident/ })).toHaveAttribute("href", "/app/food-beverage/incidents?create=1");
     expect(screen.queryByText("Service Requests")).not.toBeInTheDocument();
     expect(screen.queryByText("Work Orders")).not.toBeInTheDocument();
+  });
+});
+
+describe("General Manager supervisor calls", () => {
+  it("calls one department supervisor or all department supervisors to the office", () => {
+    const before = getDepartmentNotifications().length;
+    render(<ManagerDashboard/>);
+    fireEvent.click(screen.getByRole("button", { name: "Call supervisors" }));
+    fireEvent.change(screen.getByLabelText("Supervisor call recipients"), { target: { value: "user-sam" } });
+    fireEvent.change(screen.getByLabelText("Supervisor call message"), { target: { value: "Please bring the morning maintenance summary." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send call" }));
+    expect(getDepartmentNotifications()).toHaveLength(before + 1);
+    expect(getDepartmentNotifications()[0]).toEqual(expect.objectContaining({ department: "Maintenance", recipientName: "Sam Rivera", audience: "SUPERVISORS", kind: "MANAGER_CALL", message: "Please bring the morning maintenance summary." }));
+    fireEvent.click(screen.getByRole("button", { name: "Call supervisors" }));
+    fireEvent.change(screen.getByLabelText("Supervisor call recipients"), { target: { value: "all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send call" }));
+    expect(getDepartmentNotifications().length).toBe(before + 3);
   });
 });
 

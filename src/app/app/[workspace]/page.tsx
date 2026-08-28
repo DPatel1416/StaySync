@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FoodBeverageDashboard, FrontDeskDashboard, HousekeepingDashboard, MaintenanceDashboard, ManagerDashboard } from "@/components/dashboard/workspaces";
 import { getAuthenticatedViewer } from "@/lib/auth/viewer";
 
@@ -9,5 +9,6 @@ export default async function WorkspacePage({ params }: { params: Promise<{ work
   if (workspace === "maintenance") return <MaintenanceDashboard/>;
   if (workspace === "food-beverage") return <FoodBeverageDashboard/>;
   if (workspace === "manager") return <ManagerDashboard viewer={await getAuthenticatedViewer()}/>;
+  if (workspace.startsWith("department-")) redirect(`/app/${workspace}/operations-log`);
   notFound();
 }
