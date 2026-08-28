@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
 
 export type DepartmentNotification = {
@@ -23,6 +23,16 @@ let notifications: DepartmentNotification[] = [];
 const listeners = new Set<() => void>();
 const storageKey = "staysync-department-notifications";
 let hydrated = false;
+export const openedNotificationRetentionMs = 24 * 60 * 60 * 1000;
+
+function removeExpiredOpenedNotifications(shouldNotify = false) {
+  const now = Date.now();
+  const remaining = notifications.filter((notification) => !notification.readAt || now - notification.readAt < openedNotificationRetentionMs);
+  if (remaining.length === notifications.length) return;
+  notifications = remaining;
+  persist();
+  if (shouldNotify) notify();
+}
 
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
@@ -35,8 +45,10 @@ function hydrate() {
   }
   subscribeBrowserState(storageKey, (value) => {
     try { notifications = value ? JSON.parse(value) as DepartmentNotification[] : []; } catch { notifications = []; }
+    removeExpiredOpenedNotifications();
     notify();
   });
+  removeExpiredOpenedNotifications();
 }
 
 function persist() {
@@ -89,6 +101,7 @@ function playNotificationSound(kind: "standard" | "urgent") {
 
 export function getDepartmentNotifications() {
   hydrate();
+  removeExpiredOpenedNotifications();
   return notifications;
 }
 
@@ -114,5 +127,15 @@ export function useDepartmentNotifications(department: string, isSupervisor = tr
     () => { hydrate(); return notifications; },
     () => notifications,
   );
+  useEffect(() => {
+    const nextExpiry = allNotifications.reduce<number | null>((nearest, notification) => {
+      if (!notification.readAt) return nearest;
+      const expiresAt = notification.readAt + openedNotificationRetentionMs;
+      return nearest === null || expiresAt < nearest ? expiresAt : nearest;
+    }, null);
+    if (nextExpiry === null) return;
+    const timeout = window.setTimeout(() => removeExpiredOpenedNotifications(true), Math.max(0, nextExpiry - Date.now()) + 10);
+    return () => window.clearTimeout(timeout);
+  }, [allNotifications]);
   return allNotifications.filter((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor) && (!notification.recipientName || notification.recipientName === recipientName));
 }

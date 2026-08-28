@@ -60,7 +60,7 @@ function Toolbar({ placeholder, action }: { placeholder: string; action?: React.
 function OperationsLog({ role, autoOpen = false }: { role: WorkspaceRole; autoOpen?: boolean }) {
   const accounts = useUserAccounts();
   const departments = useDepartments();
-  const defaultEmployee = role === "front-desk" ? demoEmployees["alex.morgan"] : role === "housekeeping" ? demoEmployees["sofia.martin"] : role === "maintenance" ? demoEmployees["sam.rivera"] : role === "food-beverage" ? demoEmployees["olivia.bennett"] : role === "manager" ? demoEmployees["maya.chen"] : accounts.find((account) => account.workspace === role) ?? { name: "Department team member", isSupervisor: false, title: "Team Member" };
+  const defaultEmployee = useMemo(() => role === "front-desk" ? demoEmployees["alex.morgan"] : role === "housekeeping" ? demoEmployees["sofia.martin"] : role === "maintenance" ? demoEmployees["sam.rivera"] : role === "food-beverage" ? demoEmployees["olivia.bennett"] : role === "manager" ? demoEmployees["maya.chen"] : accounts.find((account) => account.workspace === role) ?? { name: "Department team member", isSupervisor: false, title: "Team Member" }, [accounts, role]);
   const [currentEmployee, setCurrentEmployee] = useState(defaultEmployee);
   const [logs, setLogs] = useState<EditableLog[]>(latestLogs);
   const [selectedLog, setSelectedLog] = useState<EditableLog | null>(null);

@@ -31,7 +31,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   if (!employee) return NextResponse.json({ error: "That employee account was not found." }, { status: 404 });
   try {
     const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace as WorkspaceRole, parsed.data.title);
-    const authUpdates: { email?: string; password?: string; user_metadata: Record<string, unknown> } = { user_metadata: { display_name: parsed.data.name, account_kind: "EMPLOYEE", requires_password_change: Boolean(parsed.data.password) } };
+    const { data: authRecord, error: authRecordError } = await admin.auth.admin.getUserById(userId);
+    if (authRecordError || !authRecord.user) throw authRecordError ?? new Error("The employee sign-in could not be loaded.");
+    const authUpdates: { email?: string; password?: string; user_metadata: Record<string, unknown> } = { user_metadata: { ...authRecord.user.user_metadata, display_name: parsed.data.name, username: parsed.data.username, account_kind: "EMPLOYEE", requires_password_change: Boolean(parsed.data.password) } };
     if (employee.username !== parsed.data.username) authUpdates.email = employeeAuthEmail(parsed.data.username, access.viewer.organizationId);
     if (parsed.data.password) authUpdates.password = parsed.data.password;
     const { error: authError } = await admin.auth.admin.updateUserById(userId, authUpdates);

@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { ModulePage } from "./module-pages";
-import { getDepartmentNotifications } from "@/lib/notification-store";
+import { getDepartmentNotifications, markDepartmentNotificationRead, openedNotificationRetentionMs, sendDepartmentReminder } from "@/lib/notification-store";
 import { MaintenanceDashboard } from "./dashboard/workspaces";
-import { authenticateDemoEmployee, clearDemoEmployeeSession, saveDemoEmployeeSession } from "@/lib/demo-auth";
+import { authenticateDemoEmployee, clearDemoEmployeeSession, getSavedDemoEmployeeUsername, saveDemoEmployeeSession } from "@/lib/demo-auth";
 import { addServiceRequest, deleteServiceRequest, updateServiceRequest } from "@/lib/service-request-store";
 import { updateHousekeepingRoom } from "@/lib/housekeeping-room-store";
 import { isRoomUpdateVisible } from "@/lib/room-update-store";
@@ -18,6 +18,15 @@ vi.hoisted(() => {
 afterAll(() => vi.useRealTimers());
 
 describe("Service Request reminders", () => {
+  it("removes an opened notification after one day", () => {
+    const notification = sendDepartmentReminder({ department: "Front Desk", title: "Temporary notice", message: "This should expire after it is opened.", serviceRequestId: "expiry-test", createdBy: "General Manager" });
+    markDepartmentNotificationRead(notification.id);
+    expect(getDepartmentNotifications()).toContainEqual(expect.objectContaining({ id: notification.id }));
+    vi.setSystemTime(new Date(Date.now() + openedNotificationRetentionMs + 1));
+    expect(getDepartmentNotifications().some((item) => item.id === notification.id)).toBe(false);
+    vi.setSystemTime(new Date("2026-08-23T10:00:00"));
+  });
+
   it("notifies the Housekeeping supervisor when a new request is created", () => {
     const before = getDepartmentNotifications().filter((notification) => notification.department === "Housekeeping").length;
     render(<ModulePage role="front-desk" module="service-requests" create/>);
@@ -281,20 +290,25 @@ describe("People and access", () => {
 
     fireEvent.click(within(employeeRow!).getByRole("button", { name: "Edit user" }));
     const editDialog = screen.getByRole("dialog");
+    saveDemoEmployeeSession("morgan.hayes");
+    fireEvent.change(within(editDialog).getByLabelText("Full name"), { target: { value: "Hayes Morgan" } });
+    fireEvent.change(within(editDialog).getByLabelText("Username"), { target: { value: "hayes.morgan" } });
     fireEvent.change(within(editDialog).getByLabelText("Position"), { target: { value: "Housekeeping Attendant" } });
     fireEvent.change(within(editDialog).getByLabelText(/^Reset password/), { target: { value: "manager-reset-pass" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Save changes" }));
     await act(async () => {});
-    expect(within(screen.getByText("Morgan Hayes").closest("article")!).getByText("Housekeeping Attendant · Ottawa Airport")).toBeInTheDocument();
+    expect(within(screen.getByText("Hayes Morgan").closest("article")!).getByText("Housekeeping Attendant · Ottawa Airport")).toBeInTheDocument();
     expect(authenticateDemoEmployee("morgan.hayes", "temporary-pass")).toBeNull();
-    expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")?.isSupervisor).toBe(false);
+    expect(authenticateDemoEmployee("hayes.morgan", "manager-reset-pass")?.isSupervisor).toBe(false);
+    expect(getSavedDemoEmployeeUsername()).toBe("hayes.morgan");
 
-    const updatedRow = screen.getByText("Morgan Hayes").closest("article")!;
+    const updatedRow = screen.getByText("Hayes Morgan").closest("article")!;
     fireEvent.click(within(updatedRow).getByRole("button", { name: "Suspend" }));
     fireEvent.click(within(updatedRow).getByRole("button", { name: "Confirm suspend" }));
     await act(async () => {});
-    expect(screen.queryByText("Morgan Hayes")).not.toBeInTheDocument();
-    expect(authenticateDemoEmployee("morgan.hayes", "manager-reset-pass")).toBeNull();
+    expect(screen.queryByText("Hayes Morgan")).not.toBeInTheDocument();
+    expect(authenticateDemoEmployee("hayes.morgan", "manager-reset-pass")).toBeNull();
+    clearDemoEmployeeSession();
   });
 
   it("protects the primary General Manager account from deletion", () => {

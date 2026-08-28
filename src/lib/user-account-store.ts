@@ -48,6 +48,7 @@ const seedAccounts: UserAccount[] = [
 ];
 
 const storageKey = "staysync-user-accounts";
+const sessionKey = "staysync-demo-employee";
 let accounts = [...seedAccounts];
 let hydrated = false;
 const listeners = new Set<() => void>();
@@ -90,7 +91,11 @@ export function addUserAccount(account: UserAccount) {
 
 export function updateUserAccount(updated: UserAccount) {
   hydrate();
+  const previous = accounts.find((account) => account.id === updated.id);
   accounts = accounts.map((account) => account.id === updated.id ? updated : account);
+  if (typeof window !== "undefined" && previous?.username !== updated.username && window.localStorage.getItem(sessionKey) === previous?.username) {
+    window.localStorage.setItem(sessionKey, updated.username);
+  }
   persist();
   notify();
 }
