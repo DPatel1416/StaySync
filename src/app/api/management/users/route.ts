@@ -4,6 +4,7 @@ import { requireManagementPermission, managementError } from "@/lib/auth/managem
 import { createAdminClient } from "@/lib/supabase/admin";
 import { employeeAuthEmail, prepareEmployeeAccess, workspaceFromDepartmentCode } from "@/lib/auth/employee-management";
 import type { WorkspaceRole } from "@/lib/permissions";
+import { isDuplicateIdentityError, isSupabaseUnavailable, unavailableResponse } from "@/lib/supabase/errors";
 
 const employeeSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -66,7 +67,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ user: { id: authUserId, name: parsed.data.name, username: parsed.data.username, workspace: parsed.data.workspace, title: parsed.data.title, propertyId: parsed.data.propertyId, property: access.viewer.properties.find((property) => property.id === parsed.data.propertyId)?.name, status: "Temporary password", primaryAccount: false } }, { status: 201 });
   } catch (error) {
     if (authUserId) await admin.auth.admin.deleteUser(authUserId);
-    const duplicate = error instanceof Error && /duplicate|already|registered/i.test(error.message);
-    return NextResponse.json({ error: duplicate ? "That username is already in use." : "The employee account could not be created." }, { status: duplicate ? 409 : 500 });
+    if (isSupabaseUnavailable(error)) return unavailableResponse("Employee creation");
+    if (isDuplicateIdentityError(error)) return NextResponse.json({ error: "That username is already in use." }, { status: 409 });
+    return NextResponse.json({ error: "The employee account could not be created. Confirm that the database migrations are current and the selected department exists." }, { status: 500 });
   }
 }

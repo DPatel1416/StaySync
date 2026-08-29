@@ -45,7 +45,10 @@ export function LoginForm({ onModeChange }: { onModeChange?: (mode: Mode) => voi
       }
       const client = await getSupabaseClient();
       const { data: signIn, error: signInError } = await client.auth.signInWithPassword({ email, password });
-      if (signInError) throw new Error("The email or password is incorrect.");
+      if (signInError) {
+        const unavailable = /fetch|network|timeout|unavailable|paused|502|503|504/i.test(signInError.message);
+        throw new Error(unavailable ? "Sign-in is temporarily unavailable. Confirm that the Supabase project is active, then try again." : "The email or password is incorrect.");
+      }
       if (holderAction === "signup") { window.location.assign("/onboarding"); return; }
       const { data: profile } = await client.from("users").select("home_property_id").eq("id", signIn.user.id).maybeSingle();
       if (!profile?.home_property_id) { window.location.assign("/onboarding"); return; }

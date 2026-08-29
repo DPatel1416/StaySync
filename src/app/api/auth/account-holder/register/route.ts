@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { isDuplicateIdentityError, isSupabaseUnavailable, unavailableResponse } from "@/lib/supabase/errors";
 
 const registrationSchema = z.object({
   displayName: z.string().trim().min(2).max(100),
@@ -42,9 +43,11 @@ export async function POST(request: Request) {
       if (rolePermissionError) throw rolePermissionError;
     }
     return NextResponse.json({ created: true, requiresOnboarding: true }, { status: 201 });
-  } catch {
+  } catch (caught) {
     if (userId) await admin.auth.admin.deleteUser(userId);
     if (organizationId) await admin.from("organizations").delete().eq("id", organizationId);
-    return NextResponse.json({ error: "We could not create this account. The email may already be registered." }, { status: 409 });
+    if (isSupabaseUnavailable(caught)) return unavailableResponse("Account creation");
+    if (isDuplicateIdentityError(caught)) return NextResponse.json({ error: "That email is already registered. Sign in instead or use a different email." }, { status: 409 });
+    return NextResponse.json({ error: "We could not create the account because its database setup failed. Confirm that all Supabase migrations are applied, then try again." }, { status: 500 });
   }
 }
