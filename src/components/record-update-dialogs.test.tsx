@@ -37,20 +37,20 @@ describe("Front Desk record updates", () => {
   });
 
   it("allows an author to edit their Operations Log entry", () => {
-    render(<OperationLogEditor log={{ id: "log-2", author: "Alex Morgan", department: "Front Desk", time: "Just now", message: "Original update", priority: "Urgent", pinned: false, createdAt: Date.now() }} onClose={vi.fn()} onSave={vi.fn()}/>);
+    render(<OperationLogEditor currentUserName="Current employee" log={{ id: "log-2", author: "Current employee", department: "Front Desk", time: "Just now", message: "Original update", priority: "Urgent", pinned: false, createdAt: Date.now() }} onClose={vi.fn()} onSave={vi.fn()}/>);
     expect(screen.getByLabelText("Update")).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
   });
 
   it("keeps another author's Operations Log entry read-only", () => {
-    render(<OperationLogEditor currentUserName="Jordan Lee" log={{ id: "log-2", author: "Alex Morgan", department: "Front Desk", time: "8:18 AM", message: "Original update", priority: "Urgent", pinned: false }} onClose={vi.fn()} onSave={vi.fn()}/>);
+    render(<OperationLogEditor currentUserName="Current employee" log={{ id: "log-2", author: "Another employee", department: "Front Desk", time: "8:18 AM", message: "Original update", priority: "Urgent", pinned: false }} onClose={vi.fn()} onSave={vi.fn()}/>);
     expect(screen.getByLabelText("Update")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
   });
 
   it("allows the author to delete a newly posted record after confirmation", () => {
     const onDelete = vi.fn();
-    render(<OperationLogEditor log={{ id: "log-new", author: "Alex Morgan", department: "Front Desk", sharedWith: [], time: "Just now", message: "New update", priority: "Standard", pinned: false, createdAt: Date.now() }} onClose={vi.fn()} onSave={vi.fn()} onDelete={onDelete}/>);
+    render(<OperationLogEditor currentUserName="Current employee" log={{ id: "log-new", author: "Current employee", department: "Front Desk", sharedWith: [], time: "Just now", message: "New update", priority: "Standard", pinned: false, createdAt: Date.now() }} onClose={vi.fn()} onSave={vi.fn()} onDelete={onDelete}/>);
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
@@ -58,7 +58,7 @@ describe("Front Desk record updates", () => {
   });
 
   it("locks editing and deletion after the fifteen-minute author window", () => {
-    render(<OperationLogEditor log={{ id: "log-old", author: "Alex Morgan", department: "Front Desk", sharedWith: [], time: "Earlier", message: "Old update", priority: "Standard", pinned: false, createdAt: Date.now() - 16 * 60 * 1000 }} onClose={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()}/>);
+    render(<OperationLogEditor currentUserName="Current employee" log={{ id: "log-old", author: "Current employee", department: "Front Desk", sharedWith: [], time: "Earlier", message: "Old update", priority: "Standard", pinned: false, createdAt: Date.now() - 16 * 60 * 1000 }} onClose={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()}/>);
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Update")).toBeDisabled();

@@ -1,60 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { roomUpdates as seedRoomUpdates } from "./demo-data";
-import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
+import { useEffect, useMemo, useState } from "react";
+import { createOperationsStore } from "./operations-store";
 
 export type RoomUpdate = { id?: string; room: string; type: string; detail: string; time: string; state: string; createdBy?: string; expiresAt?: number };
 
-let updates: RoomUpdate[] = [...seedRoomUpdates];
-const listeners = new Set<() => void>();
-const storageKey = "staysync-room-updates";
-let hydrated = false;
-
-function hydrate() {
-  if (hydrated || typeof window === "undefined") return;
-  hydrated = true;
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) updates = JSON.parse(stored) as RoomUpdate[];
-  } catch {
-    updates = [...seedRoomUpdates];
-  }
-  subscribeBrowserState(storageKey, (value) => {
-    try { updates = value ? JSON.parse(value) as RoomUpdate[] : [...seedRoomUpdates]; } catch { updates = [...seedRoomUpdates]; }
-    listeners.forEach((listener) => listener());
-  });
-}
-
-function persist() {
-  publishBrowserState(storageKey, JSON.stringify(updates));
-}
+const store = createOperationsStore<Required<Pick<RoomUpdate, "id">> & RoomUpdate>("room-updates");
 
 export function addRoomUpdate(update: RoomUpdate) {
-  hydrate();
-  updates = [update, ...updates];
-  persist();
-  listeners.forEach((listener) => listener());
+  store.add({ ...update, id: update.id ?? `pending-${Date.now()}` });
 }
 
 export function updateRoomUpdateState(id: string | undefined, fallbackKey: string, state: string) {
-  hydrate();
-  updates = updates.map((update) => (id ? update.id === id : `${update.room}-${update.type}` === fallbackKey) ? { ...update, state } : update);
-  persist();
-  listeners.forEach((listener) => listener());
+  const target = store.get().find((update) => (id ? update.id === id : `${update.room}-${update.type}` === fallbackKey));
+  if (target) store.update({ ...target, state });
 }
 
 export function markRoomClearedByMaintenance(room: string, actor: string) {
-  hydrate();
-  let matched = false;
-  updates = updates.map((update) => {
-    if (update.room !== room || update.type !== "Out of service") return update;
-    matched = true;
-    return { ...update, detail: `Maintenance cleared room ${room}. Housekeeping may assign the room for cleaning.`, time: "Just now", state: "Ready to assign", createdBy: actor };
-  });
-  if (!matched) updates = [{ id: `clearance-${room}-${Date.now()}`, room, type: "Maintenance clearance", detail: `Maintenance cleared room ${room}. Housekeeping may assign the room for cleaning.`, time: "Just now", state: "Ready to assign", createdBy: actor }, ...updates];
-  persist();
-  listeners.forEach((listener) => listener());
+  const existing = store.get().find((update) => update.room === room && update.type === "Out of service");
+  const cleared = { id: existing?.id ?? `pending-${Date.now()}`, room, type: existing ? "Out of service" : "Maintenance clearance", detail: `Maintenance cleared room ${room}. Housekeeping may assign the room for cleaning.`, time: "Just now", state: "Ready to assign", createdBy: actor };
+  if (existing) store.update(cleared); else store.add(cleared);
 }
 
 export function isInformationalRoomChange(update: Pick<RoomUpdate, "type">) {
@@ -67,11 +32,7 @@ export function isRoomUpdateVisible(update: RoomUpdate, now = Date.now()) {
 }
 
 export function useRoomUpdates() {
-  const allUpdates = useSyncExternalStore<RoomUpdate[]>(
-    (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
-    () => { hydrate(); return updates; },
-    () => seedRoomUpdates as RoomUpdate[],
-  );
+  const allUpdates = store.useRecords();
   const [now, setNow] = useState(() => Date.now());
   const nextExpiration = useMemo(() => allUpdates.filter((update) => isInformationalRoomChange(update) && update.expiresAt && update.expiresAt > now).reduce<number | undefined>((next, update) => next === undefined || update.expiresAt! < next ? update.expiresAt : next, undefined), [allUpdates, now]);
   useEffect(() => {

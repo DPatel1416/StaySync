@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
-import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
+import { useEffect, useMemo, useState } from "react";
+import { createOperationalRecord } from "./operations-client";
+import { createOperationsStore } from "./operations-store";
 
 export type DepartmentNotification = {
   id: string;
@@ -19,58 +20,14 @@ export type DepartmentNotification = {
   kind?: "REMINDER" | "SERVICE_REQUEST" | "ROOM_ISSUE" | "SOS" | "SUPPORT" | "INSPECTION" | "ROOM_CLEARANCE" | "MANAGER_CALL";
 };
 
-let notifications: DepartmentNotification[] = [];
-const listeners = new Set<() => void>();
-const storageKey = "staysync-department-notifications";
-let hydrated = false;
 export const openedNotificationRetentionMs = 24 * 60 * 60 * 1000;
-
-function removeExpiredOpenedNotifications(shouldNotify = false) {
-  const now = Date.now();
-  const remaining = notifications.filter((notification) => !notification.readAt || now - notification.readAt < openedNotificationRetentionMs);
-  if (remaining.length === notifications.length) return;
-  notifications = remaining;
-  persist();
-  if (shouldNotify) notify();
-}
-
-function hydrate() {
-  if (hydrated || typeof window === "undefined") return;
-  hydrated = true;
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) notifications = JSON.parse(stored) as DepartmentNotification[];
-  } catch {
-    notifications = [];
-  }
-  subscribeBrowserState(storageKey, (value) => {
-    try { notifications = value ? JSON.parse(value) as DepartmentNotification[] : []; } catch { notifications = []; }
-    removeExpiredOpenedNotifications();
-    notify();
-  });
-  removeExpiredOpenedNotifications();
-}
-
-function persist() {
-  publishBrowserState(storageKey, JSON.stringify(notifications));
-}
-
-function notify() {
-  listeners.forEach((listener) => listener());
-}
+const store = createOperationsStore<DepartmentNotification>("notifications");
 
 export function sendDepartmentReminder(notification: Omit<DepartmentNotification, "id" | "createdAt">) {
-  hydrate();
-  const created: DepartmentNotification = {
-    ...notification,
-    id: `notification-${Date.now()}-${notifications.length + 1}`,
-    createdAt: Date.now(),
-  };
-  notifications = [created, ...notifications];
-  persist();
-  notify();
+  const pending = { ...notification, id: `pending-${Date.now()}`, createdAt: Date.now() };
+  void createOperationalRecord("notifications", pending).catch(() => undefined);
   playNotificationSound(notification.tone === "urgent" ? "urgent" : "standard");
-  return created;
+  return pending;
 }
 
 function playNotificationSound(kind: "standard" | "urgent") {
@@ -81,61 +38,30 @@ function playNotificationSound(kind: "standard" | "urgent") {
     const context = new AudioContextClass();
     const tones = kind === "urgent" ? [660, 880, 660] : [660];
     tones.forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      const startsAt = context.currentTime + index * 0.16;
-      oscillator.frequency.value = frequency;
-      oscillator.type = "sine";
-      gain.gain.setValueAtTime(0.0001, startsAt);
-      gain.gain.exponentialRampToValueAtTime(0.12, startsAt + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + 0.12);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start(startsAt);
-      oscillator.stop(startsAt + 0.13);
+      const oscillator = context.createOscillator(); const gain = context.createGain(); const startsAt = context.currentTime + index * 0.16;
+      oscillator.frequency.value = frequency; oscillator.type = "sine"; gain.gain.setValueAtTime(0.0001, startsAt); gain.gain.exponentialRampToValueAtTime(0.12, startsAt + 0.015); gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + 0.12); oscillator.connect(gain).connect(context.destination); oscillator.start(startsAt); oscillator.stop(startsAt + 0.13);
     });
     window.setTimeout(() => void context.close(), kind === "urgent" ? 650 : 250);
-  } catch {
-    // Browsers may block sound until the user has interacted with the page.
-  }
+  } catch { /* Browsers may block sound until the user interacts with the page. */ }
 }
 
-export function getDepartmentNotifications() {
-  hydrate();
-  removeExpiredOpenedNotifications();
-  return notifications;
-}
+function visible(records: DepartmentNotification[], now = Date.now()) { return records.filter((item) => !item.readAt || now - item.readAt < openedNotificationRetentionMs); }
+export function getDepartmentNotifications() { return visible(store.get()); }
 
-export function markDepartmentNotificationsRead(department: string, isSupervisor = true) {
-  hydrate();
+export function markDepartmentNotificationsRead(_department: string, _isSupervisor = true) {
   const readAt = Date.now();
-  notifications = notifications.map((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor) && !notification.readAt ? { ...notification, readAt } : notification);
-  persist();
-  notify();
+  store.get().filter((item) => !item.readAt).forEach((item) => store.update({ ...item, readAt }));
 }
 
 export function markDepartmentNotificationRead(id: string) {
-  hydrate();
-  const readAt = Date.now();
-  notifications = notifications.map((notification) => notification.id === id && !notification.readAt ? { ...notification, readAt } : notification);
-  persist();
-  notify();
+  const item = store.get().find((notification) => notification.id === id);
+  if (item && !item.readAt) store.update({ ...item, readAt: Date.now() });
 }
 
-export function useDepartmentNotifications(department: string, isSupervisor = true, recipientName?: string) {
-  const allNotifications = useSyncExternalStore(
-    (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
-    () => { hydrate(); return notifications; },
-    () => notifications,
-  );
-  useEffect(() => {
-    const nextExpiry = allNotifications.reduce<number | null>((nearest, notification) => {
-      if (!notification.readAt) return nearest;
-      const expiresAt = notification.readAt + openedNotificationRetentionMs;
-      return nearest === null || expiresAt < nearest ? expiresAt : nearest;
-    }, null);
-    if (nextExpiry === null) return;
-    const timeout = window.setTimeout(() => removeExpiredOpenedNotifications(true), Math.max(0, nextExpiry - Date.now()) + 10);
-    return () => window.clearTimeout(timeout);
-  }, [allNotifications]);
-  return allNotifications.filter((notification) => notification.department === department && (notification.audience !== "SUPERVISORS" || isSupervisor) && (!notification.recipientName || notification.recipientName === recipientName));
+export function useDepartmentNotifications(_department: string, _isSupervisor = true, _recipientName?: string) {
+  const notifications = store.useRecords();
+  const [, refresh] = useState(0);
+  const nextExpiry = useMemo(() => visible(notifications).filter((item) => item.readAt).reduce<number | null>((nearest, item) => { const expiresAt = item.readAt! + openedNotificationRetentionMs; return nearest === null || expiresAt < nearest ? expiresAt : nearest; }, null), [notifications]);
+  useEffect(() => { if (nextExpiry === null) return; const timeout = window.setTimeout(() => refresh((value) => value + 1), Math.max(0, nextExpiry - Date.now()) + 10); return () => window.clearTimeout(timeout); }, [nextExpiry]);
+  return visible(notifications);
 }

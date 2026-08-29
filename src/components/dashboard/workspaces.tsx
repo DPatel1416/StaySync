@@ -4,11 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BellRing, BookPlus, ClipboardPlus, Clock3, FilePlus2, Minus, PackagePlus, Plus, ShieldPlus, Sparkles, UserPlus, Wrench } from "lucide-react";
-import { propertyDailyOperations } from "@/lib/demo-data";
 import { isInformationalRoomChange, useRoomUpdates } from "@/lib/room-update-store";
 import { addServiceRequest, useServiceRequests } from "@/lib/service-request-store";
 import { markDepartmentNotificationRead, sendDepartmentReminder, useDepartmentNotifications } from "@/lib/notification-store";
-import { demoEmployees, getDemoEmployeeSession, type DemoEmployee } from "@/lib/demo-auth";
 import { useHousekeepingRooms } from "@/lib/housekeeping-room-store";
 import { HousekeepingRoomIssueDialog, HousekeepingSosDialog, SupervisorAssistanceDialog, type HousekeepingRoomIssueDraft, type HousekeepingSosDraft, type SupervisorAssistanceDraft } from "../record-dialogs";
 import { Badge } from "../ui/badge";
@@ -20,26 +18,27 @@ import type { Permission } from "@/lib/permissions";
 import { getDepartmentLabel, useDepartments } from "@/lib/department-store";
 import { Button } from "../ui/button";
 import { X } from "lucide-react";
-import { useUserAccounts, type UserAccount } from "@/lib/user-account-store";
+import type { UserAccount } from "@/lib/user-account-store";
+import { useIncidents } from "@/lib/incident-store";
+import { useDepartmentScores } from "@/lib/department-score-store";
 
-export function FrontDeskDashboard() {
+export function FrontDeskDashboard({ viewer }: { viewer?: AuthenticatedViewer | null }) {
   const requests = useServiceRequests();
   const openStatuses = new Set(["Open", "Assigned", "In Progress", "Waiting"]);
   const needsAttention = requests.filter((request) => request.assigned === "Front Desk" && openStatuses.has(request.status));
-  const myOpenItems = requests.filter((request) => (request.createdBy === "Alex Morgan" || request.from === "Front Desk") && openStatuses.has(request.status));
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Good morning, Alex" description="Front Desk · Ottawa Downtown. Here’s what needs your attention today." actions={<CompactQualityScore department="Front Desk" score={94} previousScore={92}/>}/><QuickActions items={[{ label: "Create Service Request", icon: ClipboardPlus, primary: true, href: "/app/front-desk/service-requests?create=1" }, { label: "Add Late Checkout", icon: Clock3, href: "/app/front-desk/room-updates?create=1" }, { label: "Report Incident", icon: ShieldPlus, href: "/app/front-desk/incidents?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/front-desk/operations-log?create=1" }, { label: "Add Lost & Found Item", icon: PackagePlus, href: "/app/front-desk/lost-found?create=1" }]}/>
+  const myOpenItems = requests.filter((request) => (request.createdBy === viewer?.name || request.from === "Front Desk") && openStatuses.has(request.status));
+  return <div className="space-y-6"><PageHeading eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} title={`Good morning, ${viewer?.name.split(" ")[0] ?? "team member"}`} description={`Front Desk · ${viewer?.properties[0]?.name ?? "Assigned property"}. Here’s what needs your attention today.`}/><QuickActions items={[{ label: "Create Service Request", icon: ClipboardPlus, primary: true, href: "/app/front-desk/service-requests?create=1" }, { label: "Add Late Checkout", icon: Clock3, href: "/app/front-desk/room-updates?create=1" }, { label: "Report Incident", icon: ShieldPlus, href: "/app/front-desk/incidents?create=1" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/front-desk/operations-log?create=1" }, { label: "Add Lost & Found Item", icon: PackagePlus, href: "/app/front-desk/lost-found?create=1" }]}/>
     <RoomChangeSummary workspace="front-desk"/>
     <div className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><Card><CardHeader title="Needs attention" description="Live work currently assigned to Front Desk"/>{needsAttention.length ? <ListRows rows={needsAttention.map((request) => ({ title: `${request.id} · ${request.title}`, detail: `${request.location} · Requested by ${request.from}`, badge: request.status, tone: request.priority === "Urgent" ? "urgent" : request.status === "In Progress" ? "info" : "warning", href: `/app/front-desk/service-requests?request=${request.id}` }))}/> : <DashboardEmpty message="No Front Desk actions need attention."/>}</Card><Card><CardHeader title="My open items" description="Live status of requests you created"/>{myOpenItems.length ? <ListRows rows={myOpenItems.map((request) => ({ title: `${request.id} · ${request.title}`, detail: `${request.location} · Assigned to ${request.assigned}`, badge: request.status, tone: request.status === "In Progress" ? "info" : request.status === "Waiting" ? "warning" : "neutral", href: `/app/front-desk/service-requests?request=${request.id}` }))}/> : <DashboardEmpty message="You have no open items."/>}</Card></div>
     <OperationsPreview base="/app/front-desk" role="front-desk"/></div>;
 }
 
-export function HousekeepingDashboard() {
+export function HousekeepingDashboard({ viewer }: { viewer?: AuthenticatedViewer | null }) {
   const updates = useRoomUpdates();
   const requests = useServiceRequests();
   const assignments = useHousekeepingRooms();
-  const [employee, setEmployee] = useState<DemoEmployee | null>(null);
+  const employee = viewer;
   const [alertMessage, setAlertMessage] = useState("");
-  useEffect(() => setEmployee(getDemoEmployeeSession("housekeeping") ?? demoEmployees["sofia.martin"]), []);
   const personalAssignments = assignments.filter((assignment) => assignment.assignedTo === employee?.name);
   const supervisorIssues = requests.filter((request) => request.assigned === "Housekeeping" && request.from === "Housekeeping" && request.status !== "Completed" && request.status !== "Cancelled");
   function reportRoomIssue(draft: HousekeepingRoomIssueDraft) {
@@ -55,10 +54,10 @@ export function HousekeepingDashboard() {
     sendDepartmentReminder({ department: "Housekeeping", title: `${attendant} needs help`, message: `SOS at ${draft.location}.${detail}`, serviceRequestId: id, href: "/app/housekeeping", createdBy: attendant, audience: "SUPERVISORS", tone: "urgent", kind: "SOS" });
     setAlertMessage(`Emergency SOS sent from ${draft.location}. Your supervisor has been alerted.`);
   }
-  if (employee && !employee.isSupervisor) return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title={`Good morning, ${employee.name}`} description={`Your Housekeeping overview for ${propertyDailyOperations.property}.`} actions={<CompactQualityScore department="Housekeeping" score={91} previousScore={93}/>}/>
+  if (employee && !employee.isSupervisor) return <div className="space-y-6"><PageHeading eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} title={`Good morning, ${employee.name}`} description={`Your Housekeeping overview for ${employee.properties[0]?.name ?? "your assigned property"}.`}/>
     <HousekeepingAttendantActions locations={personalAssignments.map((assignment) => `Room ${assignment.room}`)} onReport={reportRoomIssue} onSos={sendSos}/>{alertMessage && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{alertMessage}</p>}
     <AttendantRoomSummary assignments={personalAssignments}/><AssignedRoomChanges roomNumbers={personalAssignments.map((assignment) => assignment.room)}/><OperationsPreview base="/app/housekeeping" role="housekeeping"/></div>;
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title="Housekeeping" description={`Good morning, ${employee?.name ?? "Housekeeping team"}. Department assignments and supervisor follow-up for Ottawa Downtown.`} actions={<CompactQualityScore department="Housekeeping" score={91} previousScore={93}/>}/><QuickActions items={[{ label: "Assign Rooms", icon: ClipboardPlus, primary: true, href: "/app/housekeeping/assigned-rooms" }, { label: "Service Requests", icon: ClipboardPlus, href: "/app/housekeeping/service-requests" }, { label: "Reported Room Issues", icon: AlertTriangle, href: "/app/housekeeping/service-requests#reported-room-issues" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/housekeeping/operations-log?create=1" }]}/>
+  return <div className="space-y-6"><PageHeading eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} title="Housekeeping" description={`Good morning, ${employee?.name ?? "team member"}. Department assignments and supervisor follow-up for ${employee?.properties[0]?.name ?? "your assigned property"}.`}/><QuickActions items={[{ label: "Assign Rooms", icon: ClipboardPlus, primary: true, href: "/app/housekeeping/assigned-rooms" }, { label: "Service Requests", icon: ClipboardPlus, href: "/app/housekeeping/service-requests" }, { label: "Reported Room Issues", icon: AlertTriangle, href: "/app/housekeeping/service-requests#reported-room-issues" }, { label: "Add Operations Log", icon: BookPlus, href: "/app/housekeeping/operations-log?create=1" }]}/>
     <DepartmentReminders department="Housekeeping" base="/app/housekeeping"/><RoomChangeSummary workspace="housekeeping"/>
     <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]"><Card><CardHeader title="Reported room issues" description="Issues sent by Housekeeping employees for assignment"/>{supervisorIssues.length ? <ListRows rows={supervisorIssues.map((request) => ({ title: `${request.location} · ${request.title}`, detail: `${request.createdBy ?? "Housekeeping employee"} · ${request.description ?? "Review required"}`, badge: request.assignedUser === "Unassigned" ? "Needs assignment" : request.status, tone: request.priority === "Urgent" ? "urgent" : "warning", href: `/app/housekeeping/service-requests?request=${request.id}` }))}/> : <DashboardEmpty message="No employee-reported room issues need review."/>}</Card><Card className="h-fit"><CardHeader title="Today’s room board" action={<Link href="/app/housekeeping/assigned-rooms" className="text-xs font-semibold text-brand">Manage assignments</Link>}/><div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl bg-slate-100"><Metric label="Assigned" value={String(assignments.filter((room) => room.assignedTo !== "Unassigned").length)}/><Metric label="Priority" value={String(assignments.filter((room) => room.priority === "Priority").length)}/><Metric label="Ready" value={String(assignments.filter((room) => room.status === "Ready to inspect").length)}/><Metric label="Waiting" value={String(assignments.filter((room) => room.status === "Waiting").length)}/></div></Card></div><OperationsPreview base="/app/housekeeping" role="housekeeping"/></div>;
 }
@@ -70,7 +69,7 @@ function HousekeepingAttendantActions({ locations, onReport, onSos }: { location
 function AttendantRoomSummary({ assignments }: { assignments: ReturnType<typeof useHousekeepingRooms> }) {
   const inProgress = assignments.filter((room) => room.status === "In Progress").length;
   const ready = assignments.filter((room) => room.status === "Ready to inspect").length;
-  return <Card className="overflow-hidden"><CardHeader title="Today at a glance" description="Live totals for your shift" action={<Link href="/app/housekeeping/assigned-rooms" className="text-xs font-semibold text-brand">Open room board</Link>}/><div className="grid grid-cols-2 gap-px bg-slate-100 lg:grid-cols-4"><div aria-label={`${assignments.length} ${assignments.length === 1 ? "room" : "rooms"} assigned to you`}><Metric label="My assigned rooms" value={String(assignments.length)}/></div><div aria-label={`${propertyDailyOperations.expectedDepartures} departures expected hotel-wide`}><Metric label="Hotel departures" value={String(propertyDailyOperations.expectedDepartures)}/></div><div aria-label={`${inProgress} assigned rooms in progress`}><Metric label="In progress" value={String(inProgress)}/></div><div aria-label={`${ready} assigned rooms ready to inspect`}><Metric label="Ready to inspect" value={String(ready)}/></div></div></Card>;
+  return <Card className="overflow-hidden"><CardHeader title="Today at a glance" description="Live totals for your shift" action={<Link href="/app/housekeeping/assigned-rooms" className="text-xs font-semibold text-brand">Open room board</Link>}/><div className="grid grid-cols-3 gap-px bg-slate-100"><div aria-label={`${assignments.length} ${assignments.length === 1 ? "room" : "rooms"} assigned to you`}><Metric label="My assigned rooms" value={String(assignments.length)}/></div><div aria-label={`${inProgress} assigned rooms in progress`}><Metric label="In progress" value={String(inProgress)}/></div><div aria-label={`${ready} assigned rooms ready to inspect`}><Metric label="Ready to inspect" value={String(ready)}/></div></div></Card>;
 }
 
 function AssignedRoomChanges({ roomNumbers }: { roomNumbers: string[] }) {
@@ -79,11 +78,10 @@ function AssignedRoomChanges({ roomNumbers }: { roomNumbers: string[] }) {
   return <Card><CardHeader title="Changes affecting my rooms" description="Information only · removed automatically at 6:00 PM"/><div className="divide-y divide-slate-100">{updates.map((update, index) => <div key={update.id ?? `${update.room}-${update.type}-${index}`} className="flex min-h-[68px] items-center gap-3 px-5 py-3 sm:px-6"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-bold text-brand-strong">{update.room}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">Room {update.room} · {update.type}</p><p className="mt-1 text-xs text-slate-500">No action required</p></div><Badge tone="info">Information</Badge></div>)}</div></Card>;
 }
 
-export function MaintenanceDashboard() {
+export function MaintenanceDashboard({ viewer }: { viewer?: AuthenticatedViewer | null }) {
   const workOrders = useWorkOrders();
-  const [employee, setEmployee] = useState<DemoEmployee>(demoEmployees["sam.rivera"]);
+  const employee = viewer ?? { name: "Current user", isSupervisor: false, properties: [] };
   const [alertMessage, setAlertMessage] = useState("");
-  useEffect(() => setEmployee(getDemoEmployeeSession("maintenance") ?? demoEmployees["sam.rivera"]), []);
   const isSupervisor = Boolean(employee.isSupervisor);
   const visibleWork = isSupervisor ? workOrders : workOrders.filter((order) => order.assignee === employee.name);
   const priorityWork = visibleWork.filter((order) => order.status !== "Completed" && order.status !== "Cancelled" && (order.priority === "Urgent" || order.priority === "High"));
@@ -101,7 +99,8 @@ export function MaintenanceDashboard() {
     sendDepartmentReminder({ department: "Maintenance", title: urgent ? `${employee.name} needs emergency help` : `${employee.name} requested support`, message: `${urgent ? "SOS" : "Support requested"} at ${draft.location}.${detail}`, serviceRequestId: id, href: "/app/maintenance", createdBy: employee.name, audience: "SUPERVISORS", tone: urgent ? "urgent" : "info", kind: urgent ? "SOS" : "SUPPORT" });
     setAlertMessage(`${urgent ? "Emergency SOS" : "Support request"} sent from ${draft.location}. Your supervisor has been alerted.`);
   }
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title={isSupervisor ? "Maintenance" : `Good morning, ${employee.name}`} description={isSupervisor ? `Good morning, ${employee.name}. Department assignments and property maintenance for Ottawa Downtown.` : `Your assigned Maintenance work for Ottawa Downtown.`} actions={<CompactQualityScore department="Maintenance" score={96} previousScore={94}/>}/>{isSupervisor ? <QuickActions items={quickActions}/> : <MaintenanceTechnicianActions locations={assignedLocations} onAlert={notifySupervisor}/>}
+  return <div className="space-y-6">
+    <PageHeading eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} title={isSupervisor ? "Maintenance" : `Good morning, ${employee.name}`} description={isSupervisor ? `Good morning, ${employee.name}. Department assignments and property maintenance for ${employee.properties[0]?.name ?? "your assigned property"}.` : `Your assigned Maintenance work for ${employee.properties[0]?.name ?? "your assigned property"}.`}/>{isSupervisor ? <QuickActions items={quickActions}/> : <MaintenanceTechnicianActions locations={assignedLocations} onAlert={notifySupervisor}/>}
     {alertMessage && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{alertMessage}</p>}
     {isSupervisor && <DepartmentReminders department="Maintenance" base="/app/maintenance"/>}
     <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader title="Priority work" description={isSupervisor ? "Urgent and high-priority Maintenance work only" : "Urgent and high-priority work assigned to you"}/><div className="divide-y divide-slate-100">{priorityWork.map((order) => <Link href={`/app/maintenance/work-orders?request=${order.id}`} key={order.id} className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 sm:px-6"><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${order.priority === "Urgent" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}><Wrench className="size-4"/></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{order.id} · {order.title}</p><p className="mt-1 text-sm text-slate-500">{order.location} · {order.assignee}</p></div><Badge tone={order.priority === "Urgent" ? "urgent" : "warning"}>{order.status}</Badge><span className="hidden text-xs text-slate-400 sm:block">{order.age}</span></Link>)}{priorityWork.length === 0 && <DashboardEmpty message="No urgent or high-priority Maintenance work."/>}</div></Card>{isSupervisor ? <Card className="h-fit"><CardHeader title="Department workload"/><ListRows rows={[{ title: "Preventive maintenance due", detail: "5 inspections due this week", badge: "5", tone: "warning" }, { title: "Recurring room issues", detail: "3 rooms with repeat reports", badge: "Review", tone: "urgent" }, { title: "Waiting for parts", detail: "2 work orders paused", badge: "2", tone: "neutral" }]}/></Card> : <Card className="h-fit overflow-hidden"><CardHeader title="My work summary" description="Only work assigned to you"/><div className="grid grid-cols-2 gap-px bg-slate-100"><Metric label="Assigned" value={String(personalCounts.assigned)}/><Metric label="In progress" value={String(personalCounts.inProgress)}/><Metric label="Waiting" value={String(personalCounts.waiting)}/><Metric label="Completed" value={String(personalCounts.completed)}/></div></Card>}</div><OperationsPreview base="/app/maintenance" role="maintenance"/></div>;
@@ -112,23 +111,21 @@ function MaintenanceTechnicianActions({ locations, onAlert }: { locations: strin
   return <section aria-labelledby="maintenance-technician-actions"><h2 id="maintenance-technician-actions" className="sr-only">Quick actions</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Link href="/app/maintenance/work-orders" className="group flex min-h-[76px] items-center gap-3 rounded-2xl border border-brand bg-brand p-4 text-sm font-semibold text-white shadow-soft"><span className="grid size-10 place-items-center rounded-xl bg-white/15"><Wrench className="size-[19px]"/></span>My Work Orders<ArrowRight className="ml-auto hidden size-4 text-brand-border sm:block"/></Link><div className={`${dialogClass} [&>button]:border-amber-300 [&>button]:bg-amber-50 [&>button]:text-amber-950 [&>button:hover]:bg-amber-100`}><SupervisorAssistanceDialog department="Maintenance" locations={locations} urgent onSend={(draft) => onAlert(draft, true)}/></div><div className={`${dialogClass} [&>button]:border-sky-200 [&>button]:bg-sky-50 [&>button]:text-sky-950 [&>button:hover]:bg-sky-100`}><SupervisorAssistanceDialog department="Maintenance" locations={locations} onSend={(draft) => onAlert(draft, false)}/></div><Link href="/app/maintenance/operations-log?create=1" className="group flex min-h-[76px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-soft"><span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><BookPlus className="size-[19px]"/></span>Add Operations Log<ArrowRight className="ml-auto hidden size-4 text-slate-300 sm:block"/></Link></div></section>;
 }
 
-function SupervisorCallControl({ secure = false }: { secure?: boolean }) {
+function SupervisorCallControl() {
   const departments = useDepartments();
-  const localAccounts = useUserAccounts();
-  const [remoteAccounts, setRemoteAccounts] = useState<UserAccount[] | null>(null);
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState("all");
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   useEffect(() => {
-    if (!secure) return;
     fetch("/api/management/users", { cache: "no-store" }).then(async (response) => {
       if (!response.ok) return;
       const result = await response.json() as { users?: UserAccount[] };
-      setRemoteAccounts(result.users ?? []);
+      setAccounts(result.users ?? []);
     }).catch(() => undefined);
-  }, [secure]);
-  const supervisors = (remoteAccounts ?? localAccounts).filter((account) => account.workspace !== "manager" && (account.isSupervisor || /supervisor/i.test(account.title)));
+  }, []);
+  const supervisors = accounts.filter((account) => account.workspace !== "manager" && (account.isSupervisor || /supervisor/i.test(account.title)));
   function callSupervisors(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const targets = target === "all" ? supervisors : supervisors.filter((supervisor) => supervisor.id === target);
@@ -141,15 +138,25 @@ function SupervisorCallControl({ secure = false }: { secure?: boolean }) {
 }
 
 export function ManagerDashboard({ viewer = null }: { viewer?: AuthenticatedViewer | null }) {
+  const requests = useServiceRequests();
+  const workOrders = useWorkOrders();
+  const incidents = useIncidents();
+  const scores = useDepartmentScores();
   const actions: Array<{ label: string; icon: typeof BookPlus; primary?: boolean; href: string; permission: Permission }> = [{ label: "Create Announcement", icon: BookPlus, primary: true, href: "/app/manager/operations-log?create=1", permission: "CREATE_OPERATION_LOG" }, { label: "Assign Task", icon: ClipboardPlus, href: "/app/manager/service-requests?create=1", permission: "ASSIGN_SERVICE_REQUEST" }, { label: "View Reports", icon: FilePlus2, href: "/app/manager/reports", permission: "VIEW_REPORTS" }, { label: "Manage Users", icon: UserPlus, href: "/app/manager/people", permission: "MANAGE_USERS" }];
-  const propertyName = viewer?.properties[0]?.name ?? "Ottawa Downtown";
-  return <div className="space-y-6"><PageHeading eyebrow="Monday, August 17" title={`Good morning, ${viewer?.name.split(" ")[0] ?? "Maya"}`} description={`Property-wide management overview for ${propertyName}.`} actions={<SupervisorCallControl secure={Boolean(viewer)}/>}/><QuickActions items={actions.filter((action) => !viewer || viewer.permissions.includes(action.permission))}/>
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Summary label="Open issues" value="24" note="Across 4 departments"/><Summary label="Overdue" value="5" note="2 urgent" urgent/><Summary label="Awaiting review" value="3" note="Incidents & payments"/><Summary label="Completed today" value="31" note="Up 12% from Monday" success/></div>
-    <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><OperationsPreview base="/app/manager" role="manager"/><Card><CardHeader title="Department quality" description="Latest inspection scores"/><ListRows rows={[{ title: "Maintenance", detail: "Reviewed July 12", badge: "96%", tone: "success" }, { title: "Front Desk", detail: "Reviewed July 15", badge: "94%", tone: "success" }, { title: "Housekeeping", detail: "Reviewed July 10", badge: "91%", tone: "success" }, { title: "Food & Beverage", detail: "Reviewed June 28", badge: "88%", tone: "warning" }]}/></Card></div>
-    <Card><CardHeader title="Recent escalations" description="Items that need management visibility"/><ListRows rows={[{ title: "Room 604 · Repeated AC issue", detail: "Third report in 30 days · Maintenance", badge: "Investigate", tone: "urgent" }, { title: "Virtual card discrepancy", detail: "OTA booking · Room 521 · $184.50", badge: "Assigned", tone: "warning" }, { title: "Guest relocation follow-up", detail: "Incident INC-209 · Front Desk", badge: "Review", tone: "info" }]}/></Card></div>;
+  const propertyName = viewer?.properties[0]?.name ?? "your assigned property";
+  const openStatuses = new Set(["Open", "Assigned", "In Progress", "Waiting"]);
+  const openCount = requests.filter((item) => openStatuses.has(item.status)).length + workOrders.filter((item) => openStatuses.has(item.status)).length + incidents.filter((item) => openStatuses.has(item.status)).length;
+  const urgentCount = requests.filter((item) => item.priority === "Urgent" && openStatuses.has(item.status)).length + workOrders.filter((item) => item.priority === "Urgent" && openStatuses.has(item.status)).length + incidents.filter((item) => item.tone === "urgent" && openStatuses.has(item.status)).length;
+  const completedCount = requests.filter((item) => item.status === "Completed").length + workOrders.filter((item) => item.status === "Completed").length + incidents.filter((item) => item.status === "Completed" || item.status === "Closed").length;
+  const qualityRows = scores.map((score) => ({ title: score.department, detail: `Updated ${score.reviewDate}`, badge: `${score.score}%`, tone: score.score >= score.target ? "success" as const : "warning" as const }));
+  const escalationRows = incidents.filter((incident) => incident.tone === "urgent" && openStatuses.has(incident.status)).slice(0, 5).map((incident) => ({ title: incident.title, detail: `${incident.location || "Property"} · ${incident.assignedDepartment}`, badge: incident.status, tone: "urgent" as const, href: `/app/manager/incidents?request=${incident.id}` }));
+  return <div className="space-y-6"><PageHeading eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} title={`Good morning, ${viewer?.name.split(" ")[0] ?? "General Manager"}`} description={`Property-wide management overview for ${propertyName}.`} actions={<SupervisorCallControl/>}/><QuickActions items={actions.filter((action) => !viewer || viewer.permissions.includes(action.permission))}/>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Summary label="Open issues" value={String(openCount)} note="Across authorized departments"/><Summary label="Urgent" value={String(urgentCount)} note="Needs prompt attention" urgent/><Summary label="Incidents" value={String(incidents.filter((item) => openStatuses.has(item.status)).length)} note="Currently open"/><Summary label="Completed" value={String(completedCount)} note="Records currently completed" success/></div>
+    <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><OperationsPreview base="/app/manager" role="manager"/><Card><CardHeader title="Department quality" description="Current database scores"/>{qualityRows.length ? <ListRows rows={qualityRows}/> : <DashboardEmpty message="No department scores have been added."/>}</Card></div>
+    <Card><CardHeader title="Recent escalations" description="Urgent incidents that need management visibility"/>{escalationRows.length ? <ListRows rows={escalationRows}/> : <DashboardEmpty message="No urgent incident escalations."/>}</Card></div>;
 }
 
-export function FoodBeverageDashboard() {
+export function FoodBeverageDashboard({ viewer }: { viewer?: AuthenticatedViewer | null }) {
   return <div className="space-y-6"><PageHeading eyebrow="Food & Beverage" title="Good morning" description="Share department updates and report operational incidents."/><QuickActions items={[{ label: "Add Operations Log", icon: BookPlus, primary: true, href: "/app/food-beverage/operations-log?create=1" }, { label: "Report Incident", icon: ShieldPlus, href: "/app/food-beverage/incidents?create=1" }]}/><OperationsPreview base="/app/food-beverage" role="food-beverage"/></div>;
 }
 

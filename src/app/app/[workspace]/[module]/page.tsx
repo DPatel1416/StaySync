@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ModulePage } from "@/components/module-pages";
-import { getAuthenticatedViewer, isLocalDemoMode } from "@/lib/auth/viewer";
+import { getAuthenticatedViewer } from "@/lib/auth/viewer";
 import type { Permission, WorkspaceRole } from "@/lib/permissions";
 
 const roles = new Set(["front-desk", "housekeeping", "maintenance", "food-beverage", "manager"]);
@@ -27,6 +27,6 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   if (viewer && workspace === "manager") {
     const required = managerModulePermissions[module];
     if (required && !viewer.permissions.includes(required)) notFound();
-  } else if (!viewer && !isLocalDemoMode()) notFound();
-  return <ModulePage role={workspaceRole} module={module} create={query.create === "1"} requestId={query.request}/>;
+  } else if (!viewer) notFound();
+  return <ModulePage role={workspaceRole} module={module} create={query.create === "1"} requestId={query.request} viewer={viewer}/>;
 }

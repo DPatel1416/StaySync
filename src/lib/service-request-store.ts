@@ -1,8 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { serviceRequests as seedServiceRequests } from "./demo-data";
-import { publishBrowserState, subscribeBrowserState } from "./browser-live-sync";
+import { createOperationsStore } from "./operations-store";
 
 export type ServiceRequest = {
   id: string;
@@ -19,75 +17,24 @@ export type ServiceRequest = {
   createdBy?: string;
 };
 
-const seed = seedServiceRequests as ServiceRequest[];
-let requests: ServiceRequest[] = [...seed];
-const listeners = new Set<() => void>();
-const storageKey = "staysync-service-requests";
-let hydrated = false;
-
-function notify() { listeners.forEach((listener) => listener()); }
-
-function removeLegacySosRequests(value: ServiceRequest[]) {
-  return value.filter((request) => !request.id.startsWith("SOS-")).map((request) => request.assigned === "Maintenance" && !request.assignedUser ? { ...request, assignedUser: request.id === "SR-1047" ? "Jordan Lee" : "Unassigned" } : request);
-}
-
-function hydrate() {
-  if (hydrated || typeof window === "undefined") return;
-  hydrated = true;
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
-      const storedRequests = JSON.parse(stored) as ServiceRequest[];
-      requests = removeLegacySosRequests(storedRequests);
-      if (JSON.stringify(requests) !== JSON.stringify(storedRequests)) persist();
-    }
-  } catch {
-    requests = [...seed];
-  }
-  subscribeBrowserState(storageKey, (value) => {
-    try {
-      const incoming = value ? JSON.parse(value) as ServiceRequest[] : [...seed];
-      requests = removeLegacySosRequests(incoming);
-      if (JSON.stringify(requests) !== JSON.stringify(incoming)) persist();
-    } catch { requests = [...seed]; }
-    notify();
-  });
-}
-
-function persist() {
-  publishBrowserState(storageKey, JSON.stringify(requests));
-}
+const store = createOperationsStore<ServiceRequest>("service-requests");
 
 export function addServiceRequest(request: ServiceRequest) {
-  hydrate();
-  requests = [request, ...requests];
-  persist();
-  notify();
+  store.add(request);
 }
 
 export function updateServiceRequest(updated: ServiceRequest) {
-  hydrate();
-  requests = requests.map((request) => request.id === updated.id ? updated : request);
-  persist();
-  notify();
+  store.update(updated);
 }
 
 export function deleteServiceRequest(id: string) {
-  hydrate();
-  requests = requests.filter((request) => request.id !== id);
-  persist();
-  notify();
+  store.remove(id);
 }
 
 export function getServiceRequests() {
-  hydrate();
-  return requests;
+  return store.get();
 }
 
 export function useServiceRequests() {
-  return useSyncExternalStore<ServiceRequest[]>(
-    (listener) => { hydrate(); listeners.add(listener); return () => listeners.delete(listener); },
-    () => { hydrate(); return requests; },
-    () => seed,
-  );
+  return store.useRecords();
 }

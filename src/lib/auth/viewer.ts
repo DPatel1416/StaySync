@@ -19,10 +19,6 @@ export type AuthenticatedViewer = {
   permissions: Permission[];
 };
 
-export function isLocalDemoMode() {
-  return process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-}
-
 export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | null> {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
