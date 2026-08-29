@@ -14,10 +14,10 @@ export const rolePermissions: Record<BuiltInWorkspaceRole, Permission[]> = {
   "front-desk": ["CREATE_SERVICE_REQUEST", "VIEW_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "UPDATE_ROOM_STATUS", "VIEW_ROOM_STATUS", "CREATE_OPERATION_LOG", "VIEW_PAYMENT_ISSUE", "VIEW_LOST_FOUND", "VIEW_DEPARTMENT_SCORE"],
   housekeeping: ["CREATE_SERVICE_REQUEST", "VIEW_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "UPDATE_ROOM_STATUS", "VIEW_ROOM_STATUS", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"],
   maintenance: ["VIEW_SERVICE_REQUEST", "ASSIGN_SERVICE_REQUEST", "CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG", "CREATE_WORK_ORDER", "VIEW_WORK_ORDER", "VIEW_DEPARTMENT_SCORE"],
-  "food-beverage": ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG"],
+  "food-beverage": ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"],
   manager: [...permissions],
 };
 
 export function can(role: WorkspaceRole, permission: Permission) {
-  return (rolePermissions[role as BuiltInWorkspaceRole] ?? ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG"]).includes(permission);
+  return (rolePermissions[role as BuiltInWorkspaceRole] ?? ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"]).includes(permission);
 }

@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ updated: true });
   }
 
-  if (viewer.accountKind === "ACCOUNT_HOLDER" && !parsed.data.email) return NextResponse.json({ error: "Email is required for the account holder." }, { status: 400 });
+  if (viewer.accountKind === "ACCOUNT_HOLDER" && !parsed.data.email) return NextResponse.json({ error: "Email is required for the General Manager." }, { status: 400 });
   const username = viewer.accountKind === "EMPLOYEE" ? parsed.data.username : undefined;
   const { error: profileError } = await admin.from("users").update({ display_name: parsed.data.name, ...(username ? { username } : {}) }).eq("id", viewer.id).eq("organization_id", viewer.organizationId);
   if (profileError) return NextResponse.json({ error: /duplicate/i.test(profileError.message) ? "That username is already in use." : "Your profile could not be updated." }, { status: /duplicate/i.test(profileError.message) ? 409 : 500 });

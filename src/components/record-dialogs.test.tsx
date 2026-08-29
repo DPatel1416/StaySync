@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, OperationLogDialog, ServiceRequestDialog } from "./record-dialogs";
+import { IncidentDialog, LateCheckoutDialog, LostFoundDialog, ManagementIncidentDialog, OperationLogDialog, PreventiveMaintenanceDialog, QualityScoreDialog, ServiceRequestDialog } from "./record-dialogs";
+import { localDateInputValue } from "@/lib/date-input-values";
 
 describe("Front Desk creation workflows", () => {
   it("keeps Operations Log departmental and makes cross-department sharing optional", () => {
@@ -46,5 +47,29 @@ describe("Front Desk creation workflows", () => {
     expect(screen.getByLabelText(/^New checkout time/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/priority/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/assign/i)).not.toBeInTheDocument();
+  });
+
+  it("prefills required operational dates with today's local date", () => {
+    const today = localDateInputValue();
+    const lostFound = render(<LostFoundDialog defaultOpen onCreate={vi.fn()}/>);
+    expect((screen.getByLabelText("Found date and time *") as HTMLInputElement).value.slice(0, 10)).toBe(today);
+    lostFound.unmount();
+
+    const checkout = render(<LateCheckoutDialog defaultOpen onCreate={vi.fn()}/>);
+    expect(screen.getByLabelText("Checkout date *")).toHaveValue(today);
+    checkout.unmount();
+
+    const preventive = render(<PreventiveMaintenanceDialog onCreate={vi.fn()}/>);
+    fireEvent.click(screen.getByRole("button", { name: "Schedule maintenance" }));
+    expect(screen.getByLabelText("Next due date *")).toHaveValue(today);
+    preventive.unmount();
+
+    const incident = render(<ManagementIncidentDialog defaultOpen properties={["Test Property"]} onCreate={vi.fn()}/>);
+    expect((screen.getByLabelText("Date and time occurred *") as HTMLInputElement).value.slice(0, 10)).toBe(today);
+    incident.unmount();
+
+    render(<QualityScoreDialog properties={["Test Property"]} onCreate={vi.fn()}/>);
+    fireEvent.click(screen.getByRole("button", { name: "Add quality score" }));
+    expect(screen.getByLabelText("Review date *")).toHaveValue(today);
   });
 });

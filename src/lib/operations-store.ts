@@ -9,10 +9,14 @@ import { createOperationalRecord, deleteOperationalRecord, loadOperationalRecord
  */
 export function createOperationsStore<T extends { id: string }>(resource: OperationsResource) {
   let records: T[] = [];
+  const serverRecords: T[] = [];
   let loaded = false;
   let loading: Promise<void> | null = null;
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
+  const subscribe = (listener: () => void) => { listeners.add(listener); void load(); return () => listeners.delete(listener); };
+  const getSnapshot = () => records;
+  const getServerSnapshot = () => serverRecords;
   const load = () => {
     if (loaded) return Promise.resolve();
     if (loading) return loading;
@@ -23,7 +27,10 @@ export function createOperationsStore<T extends { id: string }>(resource: Operat
     get() { void load(); return records; },
     add(record: T) {
       records = [record, ...records]; notify();
-      void createOperationalRecord(resource, record).then((saved) => { records = records.map((item) => item.id === record.id ? saved : item); notify(); }).catch(() => { records = records.filter((item) => item.id !== record.id); notify(); });
+      void createOperationalRecord(resource, record).then((saved) => {
+        records = [saved, ...records.filter((item) => item.id !== record.id && item.id !== saved.id)];
+        notify();
+      }).catch(() => { records = records.filter((item) => item.id !== record.id); notify(); });
     },
     update(record: T) {
       const previous = records.find((item) => item.id === record.id);
@@ -36,7 +43,7 @@ export function createOperationsStore<T extends { id: string }>(resource: Operat
       void deleteOperationalRecord(resource, id).catch(() => { records = previous; notify(); });
     },
     useRecords() {
-      return useSyncExternalStore<T[]>((listener) => { listeners.add(listener); void load(); return () => listeners.delete(listener); }, () => records, () => []);
+      return useSyncExternalStore<T[]>(subscribe, getSnapshot, getServerSnapshot);
     },
   };
 }

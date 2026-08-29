@@ -13,7 +13,7 @@ describe("LoginForm", () => {
 
   it("switches to account-holder email authentication", () => {
     render(<LoginForm/>);
-    fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
+    fireEvent.click(screen.getByRole("tab", { name: "General Manager" }));
     expect(screen.getByLabelText("Email address")).toHaveAttribute("type", "email");
     expect(screen.getByText("Forgot password?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
@@ -21,7 +21,7 @@ describe("LoginForm", () => {
 
   it("provides a new account-holder registration form", () => {
     render(<LoginForm/>);
-    fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
+    fireEvent.click(screen.getByRole("tab", { name: "General Manager" }));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     expect(screen.getByRole("heading", { name: "Create your account" })).toBeInTheDocument();
     expect(screen.getByLabelText("Your full name")).toBeInTheDocument();

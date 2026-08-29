@@ -12,9 +12,9 @@ describe("StaySync login identity", () => {
     expect(screen.getByLabelText("A modern hotel access key floating in motion")).toBeInTheDocument();
   });
 
-  it("changes the brand story for account holders", () => {
+  it("changes the brand story for General Managers", () => {
     render(<LoginPage/>);
-    fireEvent.click(screen.getByRole("tab", { name: "Account Holder" }));
+    fireEvent.click(screen.getByRole("tab", { name: "General Manager" }));
     expect(screen.getAllByRole("heading", { name: /See the whole./ }).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("A collection of hotel access keys moving into alignment")).toBeInTheDocument();
   });

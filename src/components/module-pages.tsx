@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Archive, ArrowDown, ArrowDownToLine, ArrowUp, BellRing, CalendarDays, Check, ChevronDown, Download, FileText, Filter, Minus, MessageSquare, Paperclip, Pin, Plus, Printer, Search, Send, SlidersHorizontal, X } from "lucide-react";
+import { Archive, ArrowDown, ArrowDownToLine, ArrowUp, BellRing, Building2, CalendarDays, Check, ChevronDown, CreditCard, Download, FileText, Filter, Minus, MessageSquare, Paperclip, Pin, Plus, Printer, Search, Send, ShieldCheck, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { workspaceNames } from "@/lib/workspace-labels";
 import type { WorkspaceRole } from "@/lib/permissions";
 import type { AuthenticatedViewer } from "@/lib/auth/viewer";
@@ -18,12 +18,13 @@ import { sendDepartmentReminder } from "@/lib/notification-store";
 import { assignHousekeepingRooms, parseRoomNumbers, releaseRoomToHousekeeping, updateHousekeepingRoom, useHousekeepingRooms, type HousekeepingRoomAssignment } from "@/lib/housekeeping-room-store";
 import { addWorkOrder, updateWorkOrder, useWorkOrders, type WorkOrder } from "@/lib/work-order-store";
 import { type UserAccount } from "@/lib/user-account-store";
-import { addDepartment, getDepartmentLabel, getDepartmentTitles, useDepartments } from "@/lib/department-store";
+import { addDepartment, getDepartmentLabel, getDepartmentTitles, removeDepartment as removeDepartmentOption, useDepartments } from "@/lib/department-store";
 import { addIncident, deleteIncident, updateIncident, useIncidents, type IncidentRecord } from "@/lib/incident-store";
 import { addOperationLog, deleteOperationLog, updateOperationLog, useOperationLogs } from "@/lib/operation-log-store";
 import { addDepartmentScore, updateDepartmentScore, useDepartmentScores, type DepartmentScore } from "@/lib/department-score-store";
 import { useEmployeeDirectory } from "@/lib/employee-directory-store";
 import { addLostFoundRecord, deleteLostFoundRecord, updateLostFoundRecord, useLostFoundRecords } from "@/lib/lost-found-store";
+import { localDateInputValue } from "@/lib/date-input-values";
 
 const moduleTitles: Record<string, [string, string]> = {
   incidents: ["Incidents", "Document, review, and resolve operational incidents."],
@@ -31,8 +32,9 @@ const moduleTitles: Record<string, [string, string]> = {
   "payment-issues": ["Payment discrepancies", "Resolve operational payment issues without duplicating billing."],
   "assigned-rooms": ["Assigned rooms", "Today’s room assignments and service priorities."],
   preventive: ["Preventive maintenance", "Scheduled inspections and recurring upkeep."],
-  people: ["People & access", "Manage employees, roles, property access, and temporary passwords."],
+  people: ["People & access", "Manage employees, roles, property access, and assigned passwords."],
   properties: ["Properties", "Manage organization properties and operational settings."],
+  billing: ["Billing & subscription", "Manage the organization subscription and billing ownership."],
   settings: ["Workspace settings", "Manage your preferences and department defaults."],
 };
 
@@ -51,6 +53,7 @@ export function ModulePage({ role, module, create = false, requestId, viewer }: 
   if (module === "properties" && role === "manager") return <PropertiesPage/>;
   if (module === "reports") return <Reports viewer={viewer}/>;
   if (module === "people" && role === "manager") return <PeoplePage/>;
+  if (module === "billing" && role === "manager" && viewer?.accountKind === "ACCOUNT_HOLDER") return <BillingPage viewer={viewer}/>;
   if (module === "settings") return <AccountSettings role={role}/>;
   const [title, description] = moduleTitles[module] ?? [module.replaceAll("-", " "), "Operational records for this workspace."];
   return <GenericPage title={title} description={description} module={module}/>;
@@ -324,6 +327,25 @@ function ManagementIncidentsPage({ autoOpen = false, viewer }: { autoOpen?: bool
   </div>;
 }
 
+function BillingPage({ viewer }: { viewer: AuthenticatedViewer }) {
+  const propertyCount = viewer.properties.length;
+  return <div className="space-y-6">
+    <PageHeading eyebrow="Primary General Manager" title="Billing & subscription" description="A single organization billing view for every StaySync property."/>
+    <div className="grid gap-5 lg:grid-cols-3">
+      <Card className="p-6 lg:col-span-2">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-strong"><CreditCard className="size-5"/></span><div><p className="text-sm font-semibold text-slate-500">Current subscription</p><h2 className="mt-1 text-xl font-bold tracking-tight text-slate-950">StaySync Operations</h2><p className="mt-2 text-sm leading-6 text-slate-500">Organization-wide access for {propertyCount} {propertyCount === 1 ? "property" : "properties"}.</p></div></div>
+          <Badge tone="success">Workspace active</Badge>
+        </div>
+        <div className="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Properties</p><p className="mt-2 text-2xl font-bold text-slate-950">{propertyCount}</p></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billing cycle</p><p className="mt-2 text-sm font-bold text-slate-900">Not configured</p></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Payment method</p><p className="mt-2 text-sm font-bold text-slate-900">Not on file</p></div></div>
+      </Card>
+      <Card className="p-6"><span className="grid size-11 place-items-center rounded-xl bg-slate-950 text-white"><ShieldCheck className="size-5"/></span><h2 className="mt-5 text-lg font-bold text-slate-950">Billing owner</h2><p className="mt-2 text-sm font-semibold text-slate-800">{viewer.name}</p><p className="mt-1 text-sm text-slate-500">General Manager · Primary account</p><a href="/app/manager/settings" className="mt-5 inline-flex min-h-10 items-center text-sm font-semibold text-brand hover:text-brand-strong">Update billing contact →</a></Card>
+    </div>
+    <Card><div className="flex items-center gap-3 border-b border-slate-100 px-6 py-5"><Building2 className="size-5 text-brand"/><div><h2 className="text-base font-bold text-slate-950">Organization properties</h2><p className="text-sm text-slate-500">Properties covered by this billing account.</p></div></div><div className="divide-y divide-slate-100">{viewer.properties.map((property) => <div key={property.id} className="flex items-center justify-between gap-4 px-6 py-4"><div><p className="text-sm font-semibold text-slate-900">{property.name}</p><p className="mt-1 text-xs text-slate-400">{property.isDefault ? "Default property" : "Additional property"}</p></div><Badge tone="info">Included</Badge></div>)}</div></Card>
+    <Card className="p-8 text-center"><FileText className="mx-auto size-8 text-slate-300"/><h2 className="mt-3 text-base font-bold text-slate-900">No invoices yet</h2><p className="mt-1 text-sm text-slate-500">Invoices will appear here when subscription billing is connected.</p></Card>
+  </div>;
+}
+
 function PropertiesPage() {
   const [properties, setProperties] = useState<Array<{ id: string; name: string; code: string; location: string; rooms: number; timezone: string; status: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -364,21 +386,33 @@ function SecureAccountSettings({ role }: { role: WorkspaceRole }) {
   return <div className="space-y-6"><PageHeading eyebrow={workspaceNames[role]} title="Account settings" description="Manage your sign-in details and personal account security."/><div className="grid gap-6 xl:grid-cols-2"><Card className="p-6"><h2 className="text-lg font-semibold text-slate-950">Profile and sign-in</h2><p className="mt-1 text-sm text-slate-500">These details come from your authenticated StaySync account.</p><form className="mt-6 space-y-4" onSubmit={async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); setProfileMessage(""); try { await update({ action: "profile", name: String(form.get("displayName")), ...(account.accountKind === "ACCOUNT_HOLDER" ? { email: String(form.get("email")) } : { username: String(form.get("username")) }) }); setAccount({ ...account, name: String(form.get("displayName")), email: account.accountKind === "ACCOUNT_HOLDER" ? String(form.get("email")) : account.email, username: account.accountKind === "EMPLOYEE" ? String(form.get("username")) : account.username }); setProfileMessage("Profile saved successfully."); } catch (error) { setProfileMessage(error instanceof Error ? error.message : "Your profile could not be updated."); } }}><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Display name</span><input name="displayName" defaultValue={account.name} required className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label>{account.accountKind === "ACCOUNT_HOLDER" ? <label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Account email</span><input name="email" type="email" defaultValue={account.email} required autoComplete="email" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label> : <label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Username</span><input name="username" defaultValue={account.username} required autoComplete="username" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label>}<label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Role</span><input value={account.title} readOnly className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500"/></label>{profileMessage && <p role="status" className={`rounded-xl px-3 py-2 text-sm ${profileMessage.includes("successfully") ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{profileMessage}</p>}<Button type="submit">Save profile</Button></form></Card><Card className="p-6"><h2 className="text-lg font-semibold text-slate-950">Change password</h2><p className="mt-1 text-sm text-slate-500">Confirm your current password before choosing a new one.</p><form className="mt-6 space-y-4" onSubmit={async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const currentPassword = String(form.get("currentPassword")); const newPassword = String(form.get("newPassword")); const confirmPassword = String(form.get("confirmPassword")); if (newPassword !== confirmPassword) { setPasswordMessage("The new passwords do not match."); return; } setPasswordMessage(""); try { await update({ action: "password", currentPassword, newPassword }); event.currentTarget.reset(); setPasswordMessage("Password updated successfully."); } catch (error) { setPasswordMessage(error instanceof Error ? error.message : "Your password could not be updated."); } }}><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Current password</span><input name="currentPassword" type="password" required minLength={8} autoComplete="current-password" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">New password</span><input name="newPassword" type="password" required minLength={8} autoComplete="new-password" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Confirm new password</span><input name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label>{passwordMessage && <p role="status" className={`rounded-xl px-3 py-2 text-sm ${passwordMessage.includes("successfully") ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{passwordMessage}</p>}<Button type="submit">Update password</Button></form></Card></div></div>;
 }
 
+type ManagedDepartment = {
+  id: string;
+  name: string;
+  workspace: WorkspaceRole;
+  propertyId: string;
+  builtIn: boolean;
+};
+
 function PeoplePage() {
   const [remoteAccounts, setRemoteAccounts] = useState<UserAccount[]>([]);
   const [properties, setProperties] = useState<Array<{ id?: string; name: string }>>([]);
+  const [managedDepartments, setManagedDepartments] = useState<ManagedDepartment[]>([]);
   const [loadError, setLoadError] = useState("");
   const accounts = remoteAccounts;
   const [query, setQuery] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   useEffect(() => {
-    Promise.all([fetch("/api/management/users", { cache: "no-store" }), fetch("/api/management/properties", { cache: "no-store" })]).then(async ([usersResponse, propertiesResponse]) => {
+    Promise.all([fetch("/api/management/users", { cache: "no-store" }), fetch("/api/management/properties", { cache: "no-store" }), fetch("/api/management/departments", { cache: "no-store" })]).then(async ([usersResponse, propertiesResponse, departmentsResponse]) => {
       const usersResult = await usersResponse.json();
       const propertiesResult = await propertiesResponse.json();
+      const departmentsResult = await departmentsResponse.json();
       if (!usersResponse.ok) throw new Error(usersResult.error ?? "Users could not be loaded.");
       if (!propertiesResponse.ok) throw new Error(propertiesResult.error ?? "Properties could not be loaded.");
+      if (!departmentsResponse.ok) throw new Error(departmentsResult.error ?? "Departments could not be loaded.");
       setRemoteAccounts(usersResult.users.map((account: UserAccount) => ({ ...account, password: "" })));
       setProperties(propertiesResult.properties.map((property: { id: string; name: string }) => ({ id: property.id, name: property.name })));
+      setManagedDepartments(departmentsResult.departments);
     }).catch((error) => setLoadError(error instanceof Error ? error.message : "People and property access could not be loaded."));
   }, []);
   async function saveAccount(account: UserAccount, editing: boolean) {
@@ -387,7 +421,7 @@ function PeoplePage() {
     const response = await fetch(editing ? `/api/management/users/${account.id}` : "/api/management/users", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: account.name, username: account.username, password: account.password, workspace: account.workspace, title: account.title, propertyId }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? "The employee account could not be saved.");
-    if (editing) setRemoteAccounts((current) => current.map((item) => item.id === account.id ? { ...account, propertyId, password: "", status: account.password ? "Temporary password" : item.status } : item));
+    if (editing) setRemoteAccounts((current) => current.map((item) => item.id === account.id ? { ...account, propertyId, password: "", status: "Active" } : item));
     else setRemoteAccounts((current) => [{ ...result.user, password: "" }, ...current]);
   }
   async function removeAccount(accountId: string) {
@@ -396,38 +430,404 @@ function PeoplePage() {
     if (!response.ok) throw new Error(result.error ?? "The employee account could not be suspended.");
     setRemoteAccounts((current) => current.filter((account) => account.id !== accountId));
   }
+  async function createDepartment(name: string, propertyId: string) {
+    const response = await fetch("/api/management/departments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, propertyId }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "The department could not be added.");
+    setManagedDepartments((current) => [...current, result.department]);
+    addDepartment(result.department.name);
+    return result.department as ManagedDepartment;
+  }
+  async function deleteDepartment(departmentId: string) {
+    const response = await fetch("/api/management/departments", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ departmentId }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "The department could not be deleted.");
+    const deleted = managedDepartments.find((department) => department.id === departmentId);
+    if (deleted && !managedDepartments.some((department) => department.id !== departmentId && department.workspace === deleted.workspace)) {
+      removeDepartmentOption(deleted.workspace);
+    }
+    setManagedDepartments((current) => current.filter((department) => department.id !== departmentId));
+  }
   const visibleAccounts = accounts.filter((account) => `${account.name} ${account.username} ${account.title} ${account.property}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-6"><PageHeading eyebrow="All properties" title="People & access" description="Create employee sign-ins, assign their property and title, update credentials, or suspend access." actions={<UserAccountDialog accounts={accounts} properties={properties} onSave={saveAccount}/>}/>{loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{loadError}</p>}<label className="relative block"><span className="sr-only">Search people</span><Search className="absolute left-3.5 top-3.5 size-4 text-slate-400"/><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search people, usernames, titles, or properties…" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm focus:border-brand"/></label><Card className="overflow-hidden"><div className="divide-y divide-slate-100">{visibleAccounts.map((account) => <article key={account.id} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:px-6"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-900">{account.name}</p>{account.primaryAccount && <Badge tone="brand">Primary account</Badge>}<Badge tone={account.status === "Active" ? "success" : "warning"}>{account.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{account.title} · {account.property}</p></div><div className="flex flex-wrap gap-2">{account.primaryAccount ? <a href="/app/manager/settings" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-brand hover:bg-brand-soft">Manage primary account</a> : <><UserAccountDialog accounts={accounts} account={account} properties={properties} onSave={saveAccount}/><Button type="button" size="sm" variant={confirmDeleteId === account.id ? "danger" : "ghost"} onClick={async () => { if (confirmDeleteId === account.id) { try { await removeAccount(account.id); setLoadError(""); } catch (error) { setLoadError(error instanceof Error ? error.message : "The employee account could not be suspended."); } setConfirmDeleteId(null); } else setConfirmDeleteId(account.id); }}>{confirmDeleteId === account.id ? "Confirm suspend" : "Suspend"}</Button></>}</div></article>)}{visibleAccounts.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No users match your search.</p>}</div></Card></div>;
+  const dialogProps = { accounts, properties, managedDepartments, onSave: saveAccount, onAddDepartment: createDepartment, onDeleteDepartment: deleteDepartment };
+  return <div className="space-y-6"><PageHeading eyebrow="All properties" title="People & access" description="Create employee sign-ins, assign their property and title, update credentials, or suspend access." actions={<UserAccountDialog {...dialogProps}/>}/>{loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{loadError}</p>}<label className="relative block"><span className="sr-only">Search people</span><Search className="absolute left-3.5 top-3.5 size-4 text-slate-400"/><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search people, usernames, titles, or properties…" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm focus:border-brand"/></label><Card className="overflow-hidden"><div className="divide-y divide-slate-100">{visibleAccounts.map((account) => <article key={account.id} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:px-6"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-900">{account.name}</p>{account.primaryAccount && <Badge tone="brand">Primary account</Badge>}<Badge tone={account.status === "Active" ? "success" : "warning"}>{account.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{account.title} · {account.property}</p></div><div className="flex flex-wrap gap-2">{account.primaryAccount ? <a href="/app/manager/settings" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-brand hover:bg-brand-soft">Manage primary account</a> : <><UserAccountDialog {...dialogProps} account={account}/><Button type="button" size="sm" variant={confirmDeleteId === account.id ? "danger" : "ghost"} onClick={async () => { if (confirmDeleteId === account.id) { try { await removeAccount(account.id); setLoadError(""); } catch (error) { setLoadError(error instanceof Error ? error.message : "The employee account could not be suspended."); } setConfirmDeleteId(null); } else setConfirmDeleteId(account.id); }}>{confirmDeleteId === account.id ? "Confirm suspend" : "Suspend"}</Button></>}</div></article>)}{visibleAccounts.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-500">No users match your search.</p>}</div></Card></div>;
 }
 
-function UserAccountDialog({ accounts, account, properties = [], onSave }: { accounts: UserAccount[]; account?: UserAccount; properties?: Array<{ id?: string; name: string }>; onSave?: (account: UserAccount, editing: boolean) => void | Promise<void> }) {
-  const departments = useDepartments();
+function UserAccountDialog({
+  accounts,
+  account,
+  properties = [],
+  managedDepartments = [],
+  onSave,
+  onAddDepartment,
+  onDeleteDepartment,
+}: {
+  accounts: UserAccount[];
+  account?: UserAccount;
+  properties?: Array<{ id?: string; name: string }>;
+  managedDepartments?: ManagedDepartment[];
+  onSave?: (account: UserAccount, editing: boolean) => void | Promise<void>;
+  onAddDepartment?: (name: string, propertyId: string) => Promise<ManagedDepartment>;
+  onDeleteDepartment?: (departmentId: string) => Promise<void>;
+}) {
+  const operationalDepartments = useDepartments();
   const [open, setOpen] = useState(false);
-  const [workspace, setWorkspace] = useState<WorkspaceRole>(account?.workspace ?? "front-desk");
-  const [title, setTitle] = useState(account?.title ?? getDepartmentTitles("front-desk", departments)[0]);
-  const [property, setProperty] = useState(account?.property ?? properties[0]?.name ?? "");
+  const [workspace, setWorkspace] = useState<WorkspaceRole>(
+    account?.workspace ?? "front-desk",
+  );
+  const [title, setTitle] = useState(
+    account?.title ?? getDepartmentTitles("front-desk", operationalDepartments)[0],
+  );
+  const [property, setProperty] = useState(
+    account?.property ?? properties[0]?.name ?? "",
+  );
   const [error, setError] = useState("");
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
-  function changeDepartment(next: WorkspaceRole) { setWorkspace(next); setTitle(getDepartmentTitles(next, departments)[0]); }
+  const [confirmDepartmentId, setConfirmDepartmentId] = useState<string | null>(null);
+  const [departmentBusy, setDepartmentBusy] = useState(false);
+  const selectedPropertyId = properties.find((item) => item.name === property)?.id;
+  const propertyDepartments = managedDepartments.filter((department) => department.propertyId === selectedPropertyId);
+  const selectedManagedDepartment = propertyDepartments.find((department) => department.workspace === workspace);
+  const departments = [
+    {
+      workspace: "manager" as WorkspaceRole,
+      name: "Management",
+      titles: ["General Manager", "Assistant General Manager"],
+      builtIn: true,
+    },
+    ...(propertyDepartments.length ? propertyDepartments.map((department) => ({
+      ...department,
+      titles: operationalDepartments.find((item) => item.workspace === department.workspace)?.titles
+        ?? [`${department.name} Team Member`, `${department.name} Supervisor`],
+    })) : operationalDepartments),
+  ];
+  useEffect(() => {
+    const preferredProperty =
+      account?.property &&
+      properties.some((item) => item.name === account.property)
+        ? account.property
+        : (properties[0]?.name ?? "");
+    if (!properties.some((item) => item.name === property))
+      setProperty(preferredProperty);
+  }, [account?.property, open, properties, property]);
+  useEffect(() => {
+    if (workspace === "manager" || departments.some((department) => department.workspace === workspace)) return;
+    const fallback = departments.find((department) => department.workspace !== "manager") ?? departments[0];
+    if (fallback) {
+      setWorkspace(fallback.workspace);
+      setTitle(fallback.titles[0]);
+    }
+  }, [departments, workspace]);
+  function changeDepartment(next: WorkspaceRole) {
+    setWorkspace(next);
+    setTitle(getDepartmentTitles(next, departments)[0]);
+    setConfirmDepartmentId(null);
+  }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name")).trim();
     const username = String(form.get("username")).trim().toLowerCase();
     const password = String(form.get("password"));
-    if (accounts.some((item) => item.id !== account?.id && item.username === username)) return setError("That username is already in use.");
-    if (!account && password.length < 8) return setError("Use at least 8 characters for the temporary password.");
-    if (account && password && password.length < 8) return setError("Use at least 8 characters for the new password.");
-    const next: UserAccount = { id: account?.id ?? `user-${Date.now()}`, name, username, password: password || account?.password || "", workspace, title, isSupervisor: title.includes("Supervisor") || workspace === "manager", property, propertyId: properties.find((item) => item.name === property)?.id, status: account?.status ?? "Temporary password", primaryAccount: account?.primaryAccount };
-    try { if (!onSave) throw new Error("Account management is unavailable."); await onSave(next, Boolean(account)); setError(""); setOpen(false); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "The employee account could not be saved."); }
+    if (!property || !properties.some((item) => item.name === property))
+      return setError(
+        "Select an authorized property. If no property is listed, refresh after completing property setup.",
+      );
+    if (
+      accounts.some(
+        (item) => item.id !== account?.id && item.username === username,
+      )
+    )
+      return setError("That username is already in use.");
+    if (!account && password.length < 8)
+      return setError("Use at least 8 characters for the assigned password.");
+    if (account && password && password.length < 8)
+      return setError("Use at least 8 characters for the new password.");
+    const next: UserAccount = {
+      id: account?.id ?? `user-${Date.now()}`,
+      name,
+      username,
+      password: password || account?.password || "",
+      workspace,
+      title,
+      isSupervisor: title.includes("Supervisor") || workspace === "manager",
+      property,
+      propertyId: properties.find((item) => item.name === property)?.id,
+      status: "Active",
+      primaryAccount: account?.primaryAccount,
+    };
+    try {
+      if (!onSave) throw new Error("Account management is unavailable.");
+      await onSave(next, Boolean(account));
+      setError("");
+      setOpen(false);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The employee account could not be saved.",
+      );
+    }
   }
-  return <Dialog.Root open={open} onOpenChange={(next) => { setOpen(next); if (next) setError(""); }}><Dialog.Trigger asChild>{account ? <Button type="button" size="sm" variant="secondary">Edit user</Button> : <Button type="button"><Plus className="size-4"/>Create user</Button>}</Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">{account ? `Edit ${account.name}` : "Create user"}</Dialog.Title><Dialog.Description className="mt-1 text-sm text-slate-500">{account ? "Update this employee’s username, property, position, or issue a temporary password." : "Create a username and temporary password, then assign the employee to a property."}</Dialog.Description></div><Dialog.Close className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div><form className="mt-6 space-y-4" onSubmit={submit}><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Full name</span><input name="name" defaultValue={account?.name} required className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Username</span><input name="username" defaultValue={account?.username} required autoCapitalize="none" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Property</span><select aria-label="Property" value={property} onChange={(event) => setProperty(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand">{properties.map((item) => <option key={item.id ?? item.name}>{item.name}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className="mb-1.5 block text-sm font-semibold text-slate-700">Department</span><select aria-label="Department" value={workspace} onChange={(event) => changeDepartment(event.target.value as WorkspaceRole)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand">{departments.map((item) => <option key={item.workspace} value={item.workspace}>{item.name}</option>)}</select>{addingDepartment ? <div className="mt-2 flex gap-2"><input aria-label="New department name" value={newDepartmentName} onChange={(event) => setNewDepartmentName(event.target.value)} className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-2 text-xs" placeholder="Department name"/><button type="button" className="rounded-lg bg-brand px-3 text-xs font-semibold text-white" onClick={() => { try { const added = addDepartment(newDepartmentName); setWorkspace(added.workspace); setTitle(added.titles[0]); setNewDepartmentName(""); setAddingDepartment(false); } catch (caught) { setError(caught instanceof Error ? caught.message : "Department could not be added."); } }}>Add</button></div> : <button type="button" onClick={() => setAddingDepartment(true)} className="mt-2 text-xs font-semibold text-brand hover:underline">+ Add department</button>}</label><label><span className="mb-1.5 block text-sm font-semibold text-slate-700">Position</span><select aria-label="Position" value={title} onChange={(event) => setTitle(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand">{getDepartmentTitles(workspace, departments).map((value) => <option key={value}>{value}</option>)}</select></label></div><p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">New departments receive Operations Log and Incident Reports access only.</p><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">{account ? "Reset password (optional)" : "Temporary password"}</span><input name="password" type="password" required={!account} minLength={account ? undefined : 8} autoComplete="new-password" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/><span className="mt-1.5 block text-xs text-slate-400">At least 8 characters. {account ? "Leave blank to keep the existing sign-in. The current password is never displayed." : "Share it securely. StaySync never returns or displays it after creation."}</span></label>{error && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}<div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit">{account ? "Save changes" : "Create user"}</Button></div></form></Dialog.Content></Dialog.Portal></Dialog.Root>;
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setError("");
+      }}
+    >
+      <Dialog.Trigger asChild>
+        {account ? (
+          <Button type="button" size="sm" variant="secondary">
+            Edit user
+          </Button>
+        ) : (
+          <Button type="button">
+            <Plus className="size-4" />
+            Create user
+          </Button>
+        )}
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">
+                {account ? `Edit ${account.name}` : "Create user"}
+              </Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-slate-500">
+                {account
+                  ? "Update this employee’s username, property, position, or assign a new password."
+                  : "Create a username and password, then assign the employee to a property."}
+              </Dialog.Description>
+            </div>
+            <Dialog.Close
+              className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              <X className="size-5" />
+            </Dialog.Close>
+          </div>
+          <form className="mt-6 space-y-4" onSubmit={submit}>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Full name
+              </span>
+              <input
+                name="name"
+                defaultValue={account?.name}
+                required
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Username
+              </span>
+              <input
+                name="username"
+                defaultValue={account?.username}
+                required
+                autoCapitalize="none"
+                pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}"
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Property
+              </span>
+              <select
+                aria-label="Property"
+                value={property}
+                onChange={(event) => setProperty(event.target.value)}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand"
+              >
+                {properties.map((item) => (
+                  <option key={item.id ?? item.name}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label>
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Department
+                </span>
+                <select
+                  aria-label="Department"
+                  value={workspace}
+                  onChange={(event) =>
+                    changeDepartment(event.target.value as WorkspaceRole)
+                  }
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand"
+                >
+                  {departments.map((item) => (
+                    <option key={item.workspace} value={item.workspace}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                {addingDepartment ? (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      aria-label="New department name"
+                      value={newDepartmentName}
+                      onChange={(event) =>
+                        setNewDepartmentName(event.target.value)
+                      }
+                      className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-2 text-xs"
+                      placeholder="Department name"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-lg bg-brand px-3 text-xs font-semibold text-white"
+                      disabled={departmentBusy}
+                      onClick={async () => {
+                        try {
+                          if (!selectedPropertyId || !onAddDepartment) throw new Error("Select a property before adding a department.");
+                          setDepartmentBusy(true);
+                          const added = await onAddDepartment(newDepartmentName, selectedPropertyId);
+                          setWorkspace(added.workspace);
+                          setTitle(`${added.name} Team Member`);
+                          setNewDepartmentName("");
+                          setAddingDepartment(false);
+                          setError("");
+                        } catch (caught) {
+                          setError(
+                            caught instanceof Error
+                              ? caught.message
+                              : "Department could not be added.",
+                          );
+                        } finally {
+                          setDepartmentBusy(false);
+                        }
+                      }}
+                    >
+                      {departmentBusy ? "Adding…" : "Add"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setAddingDepartment(true)}
+                      className="text-xs font-semibold text-brand hover:underline"
+                    >
+                      + Add department
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedManagedDepartment || selectedManagedDepartment.builtIn || departmentBusy}
+                      className={`inline-flex items-center gap-1 text-xs font-semibold ${selectedManagedDepartment && !selectedManagedDepartment.builtIn ? "text-rose-600 hover:underline" : "cursor-not-allowed text-slate-300"}`}
+                      title={!selectedManagedDepartment || selectedManagedDepartment.builtIn ? "Default departments cannot be deleted" : `Delete ${selectedManagedDepartment.name}`}
+                      onClick={async () => {
+                        if (!selectedManagedDepartment || selectedManagedDepartment.builtIn) return;
+                        if (confirmDepartmentId !== selectedManagedDepartment.id) {
+                          setConfirmDepartmentId(selectedManagedDepartment.id);
+                          return;
+                        }
+                        try {
+                          if (!onDeleteDepartment) throw new Error("Department management is unavailable.");
+                          setDepartmentBusy(true);
+                          await onDeleteDepartment(selectedManagedDepartment.id);
+                          changeDepartment("front-desk");
+                          setError("");
+                        } catch (caught) {
+                          setError(caught instanceof Error ? caught.message : "Department could not be deleted.");
+                        } finally {
+                          setDepartmentBusy(false);
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3.5"/>{confirmDepartmentId === selectedManagedDepartment?.id ? "Confirm delete" : "Delete selected"}
+                    </button>
+                  </div>
+                )}
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Position
+                </span>
+                <select
+                  aria-label="Position"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand"
+                >
+                  {getDepartmentTitles(workspace, departments).map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              New departments receive Operations Log and Incident Reports access
+              only.
+            </p>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                {account ? "Assign new password (optional)" : "Assigned password"}
+              </span>
+              <input
+                name="password"
+                type="password"
+                required={!account}
+                minLength={account ? undefined : 8}
+                autoComplete="new-password"
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"
+              />
+              <span className="mt-1.5 block text-xs text-slate-400">
+                At least 8 characters.{" "}
+                {account
+                  ? "Leave blank to keep the existing sign-in. The current password is never displayed."
+                  : "Share it securely. StaySync never returns or displays it after creation."}
+              </span>
+            </label>
+            {error && (
+              <p
+                role="alert"
+                className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700"
+              >
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+              <Dialog.Close asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button type="submit">
+                {account ? "Save changes" : "Create user"}
+              </Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }
 
-type ReportRow = { key: string; createdAt: number; departments: string[]; values: Record<string, string> };
-const reportColumns = ["ID", "Title", "Property", "Department", "Visibility", "Priority", "Status", "Created", "Author"];
+type ReportRow = {
+  key: string;
+  createdAt: number;
+  departments: string[];
+  values: Record<string, string>;
+};
+const reportColumns = [
+  "ID",
+  "Title",
+  "Property",
+  "Department",
+  "Visibility",
+  "Priority",
+  "Status",
+  "Created",
+  "Author",
+];
 
 function downloadReport(rows: ReportRow[], columns: string[], format: "csv" | "excel") {
   const safeCell = (value: string) => {
@@ -526,7 +926,7 @@ function LostFoundPage({ autoOpen = false, viewer }: { autoOpen?: boolean; viewe
 
 function GenericPage({ title, description, module }: { title: string; description: string; module: string }) { const records = genericRecords(module); return <div className="space-y-6"><PageHeading eyebrow="StaySync" title={title} description={description} actions={<EntryDialog title={`Add ${title.toLowerCase()}`} submitLabel="Save" fields={["Title or description", "Details", "Priority", "Assigned department"]}/>}/><Toolbar placeholder={`Search ${title.toLowerCase()}…`}/><Card>{records.length ? <div className="divide-y divide-slate-100">{records.map((r) => <article key={r.title} className="flex items-center gap-4 px-5 py-5 sm:px-6"><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{r.title}</p><p className="mt-1 text-sm text-slate-500">{r.detail}</p></div><Badge tone={r.tone}>{r.status}</Badge></article>)}</div> : <div className="grid min-h-72 place-items-center p-8 text-center"><div><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-slate-100 text-slate-500"><Archive className="size-5"/></span><h2 className="mt-4 font-semibold text-slate-900">Nothing here yet</h2><p className="mt-1 text-sm text-slate-500">New records will appear here when they’re added.</p></div></div>}</Card></div>; }
 
-function EntryDialog({ title, submitLabel, fields, onAdd }: { title: string; submitLabel: string; fields: string[]; onAdd?: (value: string) => void }) { const [open, setOpen] = useState(false); const [saved, setSaved] = useState(false); function submit(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const form = new FormData(e.currentTarget); onAdd?.(String(form.get("field-0") || title)); setSaved(true); setTimeout(() => { setSaved(false); setOpen(false); }, 650); } return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Trigger asChild><Button><Plus className="size-4"/>{title}</Button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">{title}</Dialog.Title><Dialog.Description className="mt-1 text-sm text-slate-500">Complete the details below. Required fields are marked.</Dialog.Description></div><Dialog.Close className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div><form onSubmit={submit} className="mt-6 space-y-4">{fields.map((field, i) => <label key={field} className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">{field}{i < 2 && <span className="text-rose-600"> *</span>}</span>{field.toLowerCase().includes("description") || field === "Message" || field.includes("Details") ? <textarea name={`field-${i}`} required={i < 2} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand" placeholder={`Enter ${field.toLowerCase()}`}/> : field.includes("date") ? <input name={`field-${i}`} type="date" required={i < 2} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/> : <input name={`field-${i}`} required={i < 2} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand" placeholder={`Enter ${field.toLowerCase()}`}/>}</label>)}<div className="flex justify-end gap-3 pt-2"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit">{saved ? <><Check className="size-4"/>Saved</> : submitLabel}</Button></div></form></Dialog.Content></Dialog.Portal></Dialog.Root>; }
+function EntryDialog({ title, submitLabel, fields, onAdd }: { title: string; submitLabel: string; fields: string[]; onAdd?: (value: string) => void }) { const [open, setOpen] = useState(false); const [saved, setSaved] = useState(false); function submit(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const form = new FormData(e.currentTarget); onAdd?.(String(form.get("field-0") || title)); setSaved(true); setTimeout(() => { setSaved(false); setOpen(false); }, 650); } return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Trigger asChild><Button><Plus className="size-4"/>{title}</Button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm"/><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><Dialog.Title className="text-xl font-bold tracking-tight text-slate-950">{title}</Dialog.Title><Dialog.Description className="mt-1 text-sm text-slate-500">Complete the details below. Required fields are marked.</Dialog.Description></div><Dialog.Close className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-5"/></Dialog.Close></div><form onSubmit={submit} className="mt-6 space-y-4">{fields.map((field, i) => <label key={field} className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">{field}{i < 2 && <span className="text-rose-600"> *</span>}</span>{field.toLowerCase().includes("description") || field === "Message" || field.includes("Details") ? <textarea name={`field-${i}`} required={i < 2} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand" placeholder={`Enter ${field.toLowerCase()}`}/> : field.toLowerCase().includes("date") ? <input name={`field-${i}`} type="date" required={i < 2} defaultValue={i < 2 ? localDateInputValue() : undefined} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand"/> : <input name={`field-${i}`} required={i < 2} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-brand" placeholder={`Enter ${field.toLowerCase()}`}/>}</label>)}<div className="flex justify-end gap-3 pt-2"><Dialog.Close asChild><Button type="button" variant="secondary">Cancel</Button></Dialog.Close><Button type="submit">{saved ? <><Check className="size-4"/>Saved</> : submitLabel}</Button></div></form></Dialog.Content></Dialog.Portal></Dialog.Root>; }
 
 function FormSelect({ label, value }: { label: string; value: string }) { return <label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span><button className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 px-3 text-left text-sm text-slate-600"><span>{value}</span><ChevronDown className="size-4 text-slate-400"/></button></label>; }
 function genericRecords(_module: string): Array<{ title: string; detail: string; status: string; tone: "neutral" | "info" | "success" | "warning" | "urgent" }> { return []; }

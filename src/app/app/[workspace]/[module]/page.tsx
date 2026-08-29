@@ -25,6 +25,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   if (allowedModules[workspaceRole] && !allowedModules[workspaceRole]!.has(module)) notFound();
   const viewer = await getAuthenticatedViewer();
   if (viewer && workspace === "manager") {
+    if (module === "billing" && viewer.accountKind !== "ACCOUNT_HOLDER") notFound();
     const required = managerModulePermissions[module];
     if (required && !viewer.permissions.includes(required)) notFound();
   } else if (!viewer) notFound();

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "StaySync — Hotel operations, in sync", template: "%s · StaySync" },
+  title: "StaySync",
   description: "A calm, connected workspace for hotel operations teams.",
 };
 

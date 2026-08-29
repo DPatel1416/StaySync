@@ -15,13 +15,37 @@ const propertySchema = z.object({
   status: z.enum(["Active", "Pre-opening", "Temporarily closed"]).default("Active"),
 });
 
+function isMissingOperationalStatus(error: { code?: string; message?: string } | null) {
+  return Boolean(
+    error
+      && ["42703", "PGRST204"].includes(error.code ?? "")
+      && /operational_status/i.test(error.message ?? ""),
+  );
+}
+
+function isDuplicatePropertyCode(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const databaseError = error as { code?: string; message?: string; details?: string };
+  return databaseError.code === "23505"
+    && /(?:properties_organization_id_code_key|organization_id.*code|code.*organization_id)/i.test(
+      `${databaseError.message ?? ""} ${databaseError.details ?? ""}`,
+    );
+}
+
 export async function GET() {
   const access = await requireManagementPermission("MANAGE_PROPERTIES");
   if ("error" in access) return access.error;
   const admin = createAdminClient();
-  const { data, error } = await admin.from("properties").select("id, name, code, timezone, address, room_count, operational_status").eq("organization_id", access.viewer.organizationId).is("archived_at", null).order("name");
+  const fullQuery = await admin.from("properties").select("id, name, code, timezone, address, room_count, operational_status").eq("organization_id", access.viewer.organizationId).is("archived_at", null).order("name");
+  let data = fullQuery.data as Array<{ id: string; name: string; code: string; timezone: string; address: { city?: string; region?: string } | null; room_count: number | null; operational_status?: string }> | null;
+  let error = fullQuery.error;
+  if (isMissingOperationalStatus(error)) {
+    const compatibleQuery = await admin.from("properties").select("id, name, code, timezone, address, room_count").eq("organization_id", access.viewer.organizationId).is("archived_at", null).order("name");
+    data = compatibleQuery.data?.map((property) => ({ ...property, operational_status: "ACTIVE" })) ?? null;
+    error = compatibleQuery.error;
+  }
   if (error) return managementError(error, "Properties could not be loaded.");
-  return NextResponse.json({ properties: data.map((property) => ({
+  return NextResponse.json({ properties: (data ?? []).map((property) => ({
     id: property.id,
     name: property.name,
     code: property.code,
@@ -41,15 +65,20 @@ export async function POST(request: Request) {
   const draft = parsed.data;
   let propertyId: string | undefined;
   try {
-    const { data: property, error } = await admin.from("properties").insert({
+    const propertyRecord = {
       organization_id: access.viewer.organizationId,
       name: draft.name,
       code: draft.code,
       timezone: draft.timezone,
       room_count: draft.rooms,
       address: { line1: draft.address, city: draft.city, region: draft.region, postal_code: draft.postalCode },
+    };
+    let creation = await admin.from("properties").insert({
+      ...propertyRecord,
       operational_status: draft.status === "Pre-opening" ? "PRE_OPENING" : draft.status === "Temporarily closed" ? "TEMPORARILY_CLOSED" : "ACTIVE",
     }).select("id, name, code, timezone, address, room_count").single();
+    if (isMissingOperationalStatus(creation.error)) creation = await admin.from("properties").insert(propertyRecord).select("id, name, code, timezone, address, room_count").single();
+    const { data: property, error } = creation;
     if (error || !property) throw error ?? new Error("Property could not be created.");
     propertyId = property.id;
 
@@ -63,13 +92,16 @@ export async function POST(request: Request) {
     const { error: departmentError } = await admin.from("departments").insert(departments);
     if (departmentError) throw departmentError;
 
-    const { data: role, error: roleError } = await admin.from("roles").select("id").eq("organization_id", access.viewer.organizationId).eq("name", "Account Holder").single();
-    if (roleError || !role) throw roleError ?? new Error("Account Holder role is missing.");
+    const { data: role, error: roleError } = await admin.from("roles").select("id").eq("organization_id", access.viewer.organizationId).in("name", ["General Manager", "Account Holder"]).limit(1).single();
+    if (roleError || !role) throw roleError ?? new Error("General Manager role is missing.");
     const { error: membershipError } = await admin.from("user_properties").insert({ user_id: access.viewer.id, property_id: property.id, role_id: role.id, is_default: access.viewer.properties.length === 0 });
     if (membershipError) throw membershipError;
     return NextResponse.json({ property: { id: property.id, name: property.name, code: property.code, timezone: property.timezone, rooms: property.room_count, location: `${draft.city}, ${draft.region}`, status: draft.status } }, { status: 201 });
   } catch (error) {
     if (propertyId) await admin.from("properties").delete().eq("id", propertyId).eq("organization_id", access.viewer.organizationId);
-    return managementError(error, "The property could not be created. Check that its code is unique.");
+    if (isDuplicatePropertyCode(error)) {
+      return NextResponse.json({ error: `Property code ${draft.code} is already in use. Choose a different code.` }, { status: 409 });
+    }
+    return managementError(error, "The property could not be created. Please try again.");
   }
 }

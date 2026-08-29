@@ -28,7 +28,13 @@ function loadDepartments() {
   loading = fetch("/api/operations?resource=departments", { cache: "no-store" }).then(async (response) => {
     if (!response.ok) return;
     const result = await response.json() as { records?: DepartmentDefinition[] };
-    if (result.records) departments = result.records;
+    if (result.records) {
+      const unique = new Map<WorkspaceRole, DepartmentDefinition>();
+      result.records.forEach((department) => {
+        if (!unique.has(department.workspace)) unique.set(department.workspace, department);
+      });
+      departments = [...unique.values()];
+    }
   }).catch(() => undefined).finally(() => { loaded = true; loading = null; notify(); });
 }
 
@@ -41,6 +47,9 @@ export function getDepartments() { loadDepartments(); return departments; }
 export function addDepartment(name: string) {
   const cleanName = name.trim().replace(/\s+/g, " ");
   if (!cleanName) throw new Error("Enter a department name.");
+  if (cleanName.toLowerCase() === "management") {
+    return { workspace: "manager" as const, name: "Management", titles: ["General Manager", "Assistant General Manager"], builtIn: true };
+  }
   const duplicate = departments.find((item) => item.name.toLowerCase() === cleanName.toLowerCase());
   if (duplicate) return duplicate;
   const slug = slugify(cleanName);
@@ -55,13 +64,20 @@ export function addDepartment(name: string) {
   return department;
 }
 
+export function removeDepartment(workspace: WorkspaceRole) {
+  const next = departments.filter((department) => department.builtIn || department.workspace !== workspace);
+  if (next.length === departments.length) return;
+  departments = next;
+  notify();
+}
+
 export function getDepartmentLabel(workspace: WorkspaceRole, source = getDepartments()) {
   if (workspace === "manager") return "Management";
   return source.find((item) => item.workspace === workspace)?.name ?? workspace.replace(/^department-/, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ");
 }
 
 export function getDepartmentTitles(workspace: WorkspaceRole, source = getDepartments()) {
-  if (workspace === "manager") return ["General Manager"];
+  if (workspace === "manager") return ["General Manager", "Assistant General Manager"];
   return source.find((item) => item.workspace === workspace)?.titles ?? [`${getDepartmentLabel(workspace, source)} Team Member`, `${getDepartmentLabel(workspace, source)} Supervisor`];
 }
 

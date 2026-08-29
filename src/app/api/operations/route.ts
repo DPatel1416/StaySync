@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedViewer, type AuthenticatedViewer } from "@/lib/auth/viewer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Permission } from "@/lib/permissions";
+import { departmentCodeFromWorkspace } from "@/lib/auth/employee-management";
 
 const resources = new Set(["service-requests", "incidents", "work-orders", "room-updates", "housekeeping-rooms", "operation-logs", "notifications", "department-scores", "employees", "lost-found", "departments"]);
 type Admin = ReturnType<typeof createAdminClient>;
@@ -10,12 +11,14 @@ function error(message: string, status = 400) { return NextResponse.json({ error
 function resourceFrom(request: Request) { const value = new URL(request.url).searchParams.get("resource") ?? ""; return resources.has(value) ? value : null; }
 function statusLabel(value: string) { return value.split("_").map((part) => part[0] + part.slice(1).toLowerCase()).join(" "); }
 function enumValue(value: unknown, fallback = "STANDARD") { return String(value || fallback).trim().toUpperCase().replace(/\s+/g, "_"); }
+function isMissingPreviousScore(error: { code?: string; message?: string } | null) {
+  return Boolean(error && ["42703", "PGRST204"].includes(error.code ?? "") && /previous_score/i.test(error.message ?? ""));
+}
 
 const readPermissions: Partial<Record<string, Permission>> = {
   "service-requests": "VIEW_SERVICE_REQUEST", incidents: "VIEW_INCIDENT",
   "work-orders": "VIEW_WORK_ORDER", "room-updates": "VIEW_ROOM_STATUS",
   "housekeeping-rooms": "VIEW_ROOM_STATUS", "operation-logs": "CREATE_OPERATION_LOG",
-  "department-scores": "VIEW_DEPARTMENT_SCORE",
   "lost-found": "VIEW_LOST_FOUND",
 };
 const createPermissions: Partial<Record<string, Permission>> = {
@@ -118,9 +121,23 @@ async function list(resource: string, viewer: AuthenticatedViewer, admin: Admin)
     if (queryError) throw queryError;
     return (data ?? []).map((row) => ({ id: row.id, department: viewer.workspace === "manager" ? "Management" : viewer.workspace, title: row.title, message: row.body, serviceRequestId: row.entity_id ?? row.id, href: row.entity_type === "operation_log" ? `/app/${viewer.workspace}/operations-log` : undefined, createdAt: Date.parse(row.created_at), createdBy: "StaySync", readAt: row.read_at ? Date.parse(row.read_at) : undefined }));
   }
-  const { data, error: queryError } = await admin.from("department_scores").select("*").eq("organization_id", viewer.organizationId).in("property_id", scope).is("archived_at", null).order("review_date", { ascending: false });
+  let scoreQuery = admin.from("department_scores").select("*").eq("organization_id", viewer.organizationId).in("property_id", scope).is("archived_at", null);
+  if (viewer.workspace !== "manager") {
+    const { data: ownDepartments, error: departmentError } = await admin.from("departments").select("id").eq("organization_id", viewer.organizationId).in("property_id", scope).eq("code", departmentCodeFromWorkspace(viewer.workspace)).is("archived_at", null);
+    if (departmentError) throw departmentError;
+    const ownDepartmentIds = (ownDepartments ?? []).map((department) => department.id);
+    if (!ownDepartmentIds.length) return [];
+    scoreQuery = scoreQuery.in("department_id", ownDepartmentIds);
+  }
+  const { data, error: queryError } = await scoreQuery.order("review_date", { ascending: false });
   if (queryError) throw queryError;
-  return (data ?? []).map((row) => ({ id: row.id, property: viewer.properties.find((item) => item.id === row.property_id)?.name ?? "Property", department: names.departments.get(row.department_id) ?? "Department", score: Number(row.score), previousScore: row.previous_score == null ? undefined : Number(row.previous_score), target: Number(row.target_score ?? 0), reviewDate: row.review_date, reviewType: row.review_type, reviewer: names.users.get(row.created_by) ?? "General Manager", comments: row.comments ?? "", followUp: false, createdAt: Date.parse(row.created_at) }));
+  const scoreByDepartment = new Map<string, (typeof data)[number]>();
+  (data ?? []).forEach((row) => {
+    const key = `${row.property_id}:${row.department_id}`;
+    if (!scoreByDepartment.has(key)) scoreByDepartment.set(key, row);
+  });
+  const currentScores = [...scoreByDepartment.values()];
+  return currentScores.map((row) => ({ id: row.id, property: viewer.properties.find((item) => item.id === row.property_id)?.name ?? "Property", department: names.departments.get(row.department_id) ?? "Department", score: Number(row.score), previousScore: row.previous_score == null ? undefined : Number(row.previous_score), target: Number(row.target_score ?? 0), reviewDate: row.review_date, reviewType: row.review_type, reviewer: names.users.get(row.created_by) ?? "General Manager", comments: row.comments ?? "", followUp: false, createdAt: Date.parse(row.created_at) }));
 }
 
 export async function GET(request: Request) {
@@ -160,7 +177,30 @@ export async function POST(request: Request) {
     else if (resource === "room-updates") { table = "room_status_updates"; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: ctx.department?.id, room_number: record.room, change_type: record.type, new_status: record.state, operational_note: record.detail, created_by: viewer.id }; }
     else if (resource === "housekeeping-rooms") { table = "room_status_updates"; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: ctx.department?.id, room_number: record.room, change_type: "HOUSEKEEPING_ASSIGNMENT", new_status: record.status, operational_note: JSON.stringify({ service: record.service, priority: record.priority, assignedTo: record.assignedTo }), created_by: viewer.id }; }
     else if (resource === "operation-logs") { table = "operation_logs"; const shared = record.sharedWith?.length ? await Promise.all(record.sharedWith.map((name: string) => departmentId(admin, viewer, ctx.property.id, name))) : []; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: ctx.department?.id, shared_department_ids: shared.filter(Boolean), author_id: viewer.id, content: record.message, priority: enumValue(record.priority), is_pinned: Boolean(record.pinned), created_by: viewer.id }; }
-    else if (resource === "department-scores") { if (!viewer.permissions.includes("MANAGE_DEPARTMENT_SCORE")) return error("You do not have permission to update scores.", 403); table = "department_scores"; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: await departmentId(admin, viewer, ctx.property.id, record.department), score: record.score, previous_score: record.previousScore ?? null, target_score: record.target, review_date: record.reviewDate, review_type: record.reviewType || "Manager review", comments: record.comments || "", created_by: viewer.id }; }
+    else if (resource === "department-scores") {
+      if (!viewer.permissions.includes("MANAGE_DEPARTMENT_SCORE")) return error("You do not have permission to update scores.", 403);
+      const selectedDepartmentId = await departmentId(admin, viewer, ctx.property.id, record.department);
+      if (!selectedDepartmentId) return error("The selected department was not found for this property.", 404);
+      const scoreValues = { score: record.score, target_score: record.target, review_date: record.reviewDate, review_type: record.reviewType || "Manager review", comments: record.comments || "", created_by: viewer.id };
+      const { data: currentScore, error: currentError } = await admin.from("department_scores").select("id, score").eq("organization_id", viewer.organizationId).eq("property_id", ctx.property.id).eq("department_id", selectedDepartmentId).is("archived_at", null).order("review_date", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (currentError) throw currentError;
+      let savedId: string;
+      if (currentScore) {
+        let updated = await admin.from("department_scores").update({ ...scoreValues, previous_score: currentScore.score }).eq("id", currentScore.id).eq("organization_id", viewer.organizationId).eq("property_id", ctx.property.id);
+        if (isMissingPreviousScore(updated.error)) updated = await admin.from("department_scores").update(scoreValues).eq("id", currentScore.id).eq("organization_id", viewer.organizationId).eq("property_id", ctx.property.id);
+        if (updated.error) throw updated.error;
+        savedId = currentScore.id;
+      } else {
+        const insertValues = { ...scoreValues, organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: selectedDepartmentId };
+        let inserted = await admin.from("department_scores").insert({ ...insertValues, previous_score: record.previousScore ?? null }).select("id").single();
+        if (isMissingPreviousScore(inserted.error)) inserted = await admin.from("department_scores").insert(insertValues).select("id").single();
+        if (inserted.error || !inserted.data) throw inserted.error ?? new Error("The department score could not be created.");
+        savedId = inserted.data.id;
+      }
+      const records = await list(resource, viewer, admin);
+      const savedRecord = records.find((item: { id: string }) => item.id === savedId) as ({ previousScore?: number } & Record<string, unknown>) | undefined;
+      return NextResponse.json({ record: currentScore && savedRecord && savedRecord.previousScore === undefined ? { ...savedRecord, previousScore: Number(currentScore.score) } : savedRecord }, { status: currentScore ? 200 : 201 });
+    }
     else if (resource === "lost-found") { table = "lost_found_items"; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: ctx.department?.id, item_description: record.title, found_location: record.foundLocation, found_at: record.foundAt, found_by: viewer.id, storage_location: record.storageLocation, guest_follow_up_status: enumValue(record.status, "NOT_STARTED"), created_by: viewer.id }; }
     else return error("Notifications are created by operational workflows.", 403);
     const { data, error: insertError } = await admin.from(table).insert(values).select("id").single(); if (insertError || !data) throw insertError;
@@ -195,10 +235,19 @@ export async function PATCH(request: Request) {
     "lost-found": { table: "lost_found_items", values: { item_description: record.title, found_location: record.foundLocation, found_at: record.foundAt, storage_location: record.storageLocation, guest_follow_up_status: enumValue(record.status, "NOT_STARTED") } },
   };
   const target = mapping[resource];
-  const query = admin.from(target.table).update(target.values).eq("id", record.id).eq(resource === "notifications" ? "user_id" : "organization_id", resource === "notifications" ? viewer.id : viewer.organizationId);
+  let query = admin.from(target.table).update(target.values).eq("id", record.id).eq(resource === "notifications" ? "user_id" : "organization_id", resource === "notifications" ? viewer.id : viewer.organizationId);
   if (resource !== "notifications") query.eq("property_id", ctx.property.id);
-  const { error: updateError } = await query; if (updateError) return error("The operational record could not be updated.", 500);
-  const records = await list(resource, viewer, admin); return NextResponse.json({ record: records.find((item: { id: string }) => item.id === record.id) ?? record });
+  let { error: updateError } = await query;
+  if (resource === "department-scores" && isMissingPreviousScore(updateError)) {
+    const compatibleValues = { ...target.values };
+    delete compatibleValues.previous_score;
+    query = admin.from(target.table).update(compatibleValues).eq("id", record.id).eq("organization_id", viewer.organizationId).eq("property_id", ctx.property.id);
+    ({ error: updateError } = await query);
+  }
+  if (updateError) return error("The operational record could not be updated.", 500);
+  const records = await list(resource, viewer, admin);
+  const savedRecord = records.find((item: { id: string }) => item.id === record.id) ?? record;
+  return NextResponse.json({ record: resource === "department-scores" && savedRecord.previousScore === undefined ? { ...savedRecord, previousScore: record.previousScore } : savedRecord });
 }
 
 export async function DELETE(request: Request) {

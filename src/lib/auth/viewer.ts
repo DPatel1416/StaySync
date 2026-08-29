@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Permission, WorkspaceRole } from "@/lib/permissions";
 import { workspaceFromDepartmentCode } from "./employee-management";
 
@@ -23,8 +24,9 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) return null;
+  const admin = createAdminClient();
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await admin
     .from("users")
     .select("id, organization_id, display_name, username, job_title, account_kind, is_active, archived_at, department_id")
     .eq("id", authData.user.id)
@@ -32,19 +34,19 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
   if (profileError || !profile || !profile.is_active || profile.archived_at) return null;
 
   const { data: department } = profile.department_id
-    ? await supabase.from("departments").select("code").eq("id", profile.department_id).maybeSingle()
+    ? await admin.from("departments").select("code").eq("id", profile.department_id).maybeSingle()
     : { data: null };
   const workspace: WorkspaceRole = profile.account_kind === "ACCOUNT_HOLDER"
     ? "manager"
     : department?.code ? workspaceFromDepartmentCode(department.code) : "front-desk";
 
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from("user_properties")
     .select("property_id, role_id, is_default, properties(name)")
     .eq("user_id", authData.user.id);
   const roleIds = [...new Set((memberships ?? []).map((membership) => membership.role_id))];
   const { data: rolePermissions } = roleIds.length
-    ? await supabase.from("role_permissions").select("permissions(code)").in("role_id", roleIds)
+    ? await admin.from("role_permissions").select("permissions(code)").in("role_id", roleIds)
     : { data: [] };
 
   const permissions = [...new Set((rolePermissions ?? []).flatMap((entry) => {
@@ -60,7 +62,7 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
     id: profile.id,
     organizationId: profile.organization_id,
     name: profile.display_name,
-    title: profile.job_title || (profile.account_kind === "ACCOUNT_HOLDER" ? "Account Holder" : "Hotel employee"),
+    title: profile.account_kind === "ACCOUNT_HOLDER" ? "General Manager" : profile.job_title || "Hotel employee",
     username: profile.username ?? "",
     workspace,
     isSupervisor: workspace === "manager" || /supervisor|manager/i.test(profile.job_title ?? ""),

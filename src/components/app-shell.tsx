@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, BookOpenText, Building2, Check, ChevronDown, CircleGauge, ClipboardList, FileChartColumn, HelpCircle, Home, LogOut, Menu, PackageSearch, Settings, ShieldAlert, Star, Users, Wrench, X } from "lucide-react";
+import { Bell, BookOpenText, Building2, Check, ChevronDown, CircleGauge, ClipboardList, CreditCard, FileChartColumn, HelpCircle, Home, LogOut, Menu, PackageSearch, Settings, ShieldAlert, Star, Users, Wrench, X } from "lucide-react";
 import { Logo } from "./logo";
 import { cn, initials } from "@/lib/utils";
 import { workspaceNames } from "@/lib/workspace-labels";
@@ -27,7 +27,7 @@ const nav = {
     ["Operations Log", "operations-log", BookOpenText], ["Incident Reports", "incidents", ShieldAlert],
   ],
   manager: [
-    ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["All Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Quality Scores", "quality-scores", Star], ["Reports", "reports", FileChartColumn], ["People", "people", Users], ["Properties", "properties", Building2],
+    ["Overview", "", Home], ["Operations Log", "operations-log", BookOpenText], ["All Requests", "service-requests", ClipboardList], ["Incidents", "incidents", ShieldAlert], ["Quality Scores", "quality-scores", Star], ["Reports", "reports", FileChartColumn], ["People", "people", Users], ["Properties", "properties", Building2], ["Billing", "billing", CreditCard],
   ],
 } satisfies Record<Exclude<WorkspaceRole, `department-${string}`>, Array<[string, string, typeof Home]>>;
 
@@ -66,7 +66,7 @@ export function AppShell({ role, children, viewer = null }: { role: WorkspaceRol
   const departmentNotifications = useDepartmentNotifications(departmentName, Boolean(user.isSupervisor), user.name);
   const unreadNotifications = departmentNotifications.filter((notification) => !notification.readAt);
   const baseNavigation: Array<[string, string, typeof Home]> = nav[role as keyof typeof nav] ?? [["Operations Log", "operations-log", BookOpenText], ["Incident Reports", "incidents", ShieldAlert]];
-  const navigationItems = baseNavigation.filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates") && !(role === "maintenance" && !user.isSupervisor && label === "Maintenance Reports") && !(viewer && role === "manager" && managerNavigationPermissions[label] && !viewer.permissions.includes(managerNavigationPermissions[label])));
+  const navigationItems = baseNavigation.filter(([label]) => !(role === "housekeeping" && !user.isSupervisor && label === "Room Updates") && !(role === "maintenance" && !user.isSupervisor && label === "Maintenance Reports") && !(viewer && role === "manager" && managerNavigationPermissions[label] && !viewer.permissions.includes(managerNavigationPermissions[label])) && !(viewer && label === "Billing" && viewer.accountKind !== "ACCOUNT_HOLDER"));
   const sidebar = <>
     <div className="flex h-[76px] items-center justify-between px-5"><Logo/><button className="grid size-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="size-5"/></button></div>
     <div className="relative mx-3 mb-4 rounded-xl border border-brand-border bg-brand-soft p-3"><button type="button" onClick={() => setPropertyOpen((current) => !current)} className="flex min-h-11 w-full items-center gap-3 text-left" aria-label={`Current property: ${property}. Open property menu`} aria-expanded={propertyOpen}><span className="grid size-9 place-items-center rounded-lg bg-white text-brand shadow-sm"><Building2 className="size-4"/></span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{property}</span><span className="block text-xs text-slate-500">StaySync workspace</span></span><ChevronDown className={cn("size-4 text-slate-400 transition-transform", propertyOpen && "rotate-180")}/></button>{propertyOpen && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" role="menu" aria-label="Authorized properties">{authorizedProperties.map((name) => <button key={name} type="button" role="menuitemradio" aria-checked={property === name} onClick={() => { setProperty(name); setPropertyOpen(false); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-50"><span className="min-w-0 flex-1 truncate font-medium">{name}</span>{property === name && <Check className="size-4 text-brand"/>}</button>)}{authorizedProperties.length === 1 && <p className="border-t border-slate-100 px-3 py-2 text-xs leading-5 text-slate-500">This is the only property assigned to your account.</p>}</div>}</div>

@@ -3,10 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rolePermissions, type BuiltInWorkspaceRole, type Permission, type WorkspaceRole } from "@/lib/permissions";
 
-export const employeeWorkspaces = ["front-desk", "housekeeping", "maintenance", "food-beverage"] as const;
+export const employeeWorkspaces = ["manager", "front-desk", "housekeeping", "maintenance", "food-beverage"] as const;
 export type EmployeeWorkspace = (typeof employeeWorkspaces)[number];
 
 export const departmentCodeByWorkspace: Record<EmployeeWorkspace, string> = {
+  manager: "MANAGEMENT",
   "front-desk": "FRONT_DESK",
   housekeeping: "HOUSEKEEPING",
   maintenance: "MAINTENANCE",
@@ -23,7 +24,7 @@ export function departmentCodeFromWorkspace(workspace: WorkspaceRole) {
 }
 
 function permissionsFor(title: string, workspace: WorkspaceRole): Permission[] {
-  const permissions = [...(rolePermissions[workspace as BuiltInWorkspaceRole] ?? ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG"])] as Permission[];
+  const permissions = [...(rolePermissions[workspace as BuiltInWorkspaceRole] ?? ["CREATE_INCIDENT", "VIEW_INCIDENT", "CREATE_OPERATION_LOG", "VIEW_DEPARTMENT_SCORE"])] as Permission[];
   if (/supervisor/i.test(title) && !permissions.includes("ASSIGN_SERVICE_REQUEST")) permissions.push("ASSIGN_SERVICE_REQUEST");
   return permissions;
 }

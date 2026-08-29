@@ -26,17 +26,17 @@ export async function POST(request: Request) {
     if (organizationError || !organization) throw organizationError ?? new Error("Organization could not be prepared");
     organizationId = organization.id;
 
-    const { data: role, error: roleError } = await admin.from("roles").insert({ organization_id: organization.id, name: "Account Holder", description: "Organization owner with administrative access" }).select("id").single();
+    const { data: role, error: roleError } = await admin.from("roles").insert({ organization_id: organization.id, name: "General Manager", description: "Primary General Manager with organization-wide administrative access" }).select("id").single();
     if (roleError || !role) throw roleError ?? new Error("Role could not be created");
 
     const { data: authUser, error: authError } = await admin.auth.admin.createUser({ email: parsed.data.email.toLowerCase(), password: parsed.data.password, email_confirm: true, user_metadata: { display_name: parsed.data.displayName, account_kind: "ACCOUNT_HOLDER", onboarding_complete: false } });
     if (authError || !authUser.user) throw authError ?? new Error("Account could not be created");
     userId = authUser.user.id;
 
-    const { error: profileError } = await admin.from("users").insert({ id: userId, organization_id: organization.id, display_name: parsed.data.displayName, job_title: "Account Holder", account_kind: "ACCOUNT_HOLDER" });
+    const { error: profileError } = await admin.from("users").insert({ id: userId, organization_id: organization.id, display_name: parsed.data.displayName, job_title: "General Manager", account_kind: "ACCOUNT_HOLDER" });
     if (profileError) throw profileError;
 
-    const { data: permissions, error: permissionError } = await admin.from("permissions").select("id").in("code", ["MANAGE_USERS", "MANAGE_PROPERTIES", "VIEW_REPORTS", "MANAGE_DEPARTMENT_SCORE"]);
+    const { data: permissions, error: permissionError } = await admin.from("permissions").select("id");
     if (permissionError) throw permissionError;
     if (permissions?.length) {
       const { error: rolePermissionError } = await admin.from("role_permissions").insert(permissions.map((permission) => ({ role_id: role.id, permission_id: permission.id })));

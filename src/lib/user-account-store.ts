@@ -13,12 +13,12 @@ export type UserAccount = {
   isSupervisor: boolean;
   property: string;
   propertyId?: string;
-  status: "Active" | "Temporary password";
+  status: "Active";
   primaryAccount?: boolean;
 };
 
 export const departmentTitles: Record<WorkspaceRole, string[]> = new Proxy({
-  manager: ["General Manager"],
+  manager: ["General Manager", "Assistant General Manager"],
   "front-desk": ["Front Desk Agent", "Front Desk Supervisor"],
   housekeeping: ["Housekeeping Attendant", "Housekeeping Supervisor"],
   maintenance: ["Maintenance Technician", "Maintenance Supervisor"],

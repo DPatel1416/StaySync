@@ -9,7 +9,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(2).max(100),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,49}$/),
   password: z.string().min(8).max(256).optional().or(z.literal("")),
-  workspace: z.string().regex(/^(front-desk|housekeeping|maintenance|food-beverage|department-[a-z0-9-]+)$/),
+  workspace: z.string().regex(/^(manager|front-desk|housekeeping|maintenance|food-beverage|department-[a-z0-9-]+)$/),
   title: z.string().trim().min(2).max(100),
   propertyId: z.string().uuid(),
 });
@@ -33,12 +33,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     const accessSetup = await prepareEmployeeAccess(admin, access.viewer.organizationId, parsed.data.propertyId, parsed.data.workspace as WorkspaceRole, parsed.data.title);
     const { data: authRecord, error: authRecordError } = await admin.auth.admin.getUserById(userId);
     if (authRecordError || !authRecord.user) throw authRecordError ?? new Error("The employee sign-in could not be loaded.");
-    const authUpdates: { email?: string; password?: string; user_metadata: Record<string, unknown> } = { user_metadata: { ...authRecord.user.user_metadata, display_name: parsed.data.name, username: parsed.data.username, account_kind: "EMPLOYEE", requires_password_change: Boolean(parsed.data.password) } };
+    const authUpdates: { email?: string; password?: string; user_metadata: Record<string, unknown> } = { user_metadata: { ...authRecord.user.user_metadata, display_name: parsed.data.name, username: parsed.data.username, account_kind: "EMPLOYEE", requires_password_change: false } };
     if (employee.username !== parsed.data.username) authUpdates.email = employeeAuthEmail(parsed.data.username, access.viewer.organizationId);
     if (parsed.data.password) authUpdates.password = parsed.data.password;
     const { error: authError } = await admin.auth.admin.updateUserById(userId, authUpdates);
     if (authError) throw authError;
-    const { error: profileError } = await admin.from("users").update({ home_property_id: parsed.data.propertyId, department_id: accessSetup.departmentId, username: parsed.data.username, display_name: parsed.data.name, job_title: parsed.data.title, requires_password_change: Boolean(parsed.data.password), is_active: true }).eq("id", userId).eq("organization_id", access.viewer.organizationId);
+    const { error: profileError } = await admin.from("users").update({ home_property_id: parsed.data.propertyId, department_id: accessSetup.departmentId, username: parsed.data.username, display_name: parsed.data.name, job_title: parsed.data.title, requires_password_change: false, is_active: true }).eq("id", userId).eq("organization_id", access.viewer.organizationId);
     if (profileError) throw profileError;
     const { error: membershipDeleteError } = await admin.from("user_properties").delete().eq("user_id", userId);
     if (membershipDeleteError) throw membershipDeleteError;

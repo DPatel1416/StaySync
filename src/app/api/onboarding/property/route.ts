@@ -53,8 +53,8 @@ export async function POST(request: Request) {
     ]);
     if (departmentsError) throw departmentsError;
 
-    const { data: role, error: roleError } = await admin.from("roles").select("id").eq("organization_id", profile.organization_id).eq("name", "Account Holder").single();
-    if (roleError || !role) throw roleError ?? new Error("Account Holder role was not found");
+    const { data: role, error: roleError } = await admin.from("roles").select("id").eq("organization_id", profile.organization_id).in("name", ["General Manager", "Account Holder"]).limit(1).single();
+    if (roleError || !role) throw roleError ?? new Error("General Manager role was not found");
     const { error: accessError } = await admin.from("user_properties").insert({ user_id: authData.user.id, property_id: property.id, role_id: role.id, is_default: true });
     if (accessError) throw accessError;
     const { error: userError } = await admin.from("users").update({ home_property_id: property.id }).eq("id", authData.user.id);
