@@ -73,6 +73,19 @@ npm start            # serve the production build
 
 Vercel runs `npm run build` from `vercel.json`. Do not add real credentials, user records, or production data to this repository.
 
+### Daily Supabase health check
+
+The production Vercel deployment schedules `/api/cron/supabase-health` daily at 06:00 UTC (Hobby timing may vary within the hour). It performs three small database reads, including when no users visit StaySync. It writes no data and returns no tenant records.
+
+To activate it:
+
+1. Restore the project in the Supabase dashboard if it is already paused. A health check cannot restore it.
+2. Set a random, server-only `CRON_SECRET` of at least 32 characters in Vercel's Production environment variables. Vercel automatically sends it as a Bearer authorization header. Keep the existing Supabase URL and service-role key configured.
+3. Deploy these changes to production. Local development and preview deployments do not run the schedule.
+4. In Vercel's Cron Jobs settings, run the job and check its logs for HTTP 200. HTTP 401 means the secret is missing or incorrect; HTTP 503 means database access or configuration failed. Check failed runs, because this job cannot repair a paused project.
+
+This is a best-effort mitigation, not a guarantee against pausing. Supabase evaluates database activity over a seven-day window and says a few daily database requests are typically sufficient. A paid Supabase plan removes automatic inactivity pausing and is the reliable option when uninterrupted availability is required. See [Supabase project pausing](https://supabase.com/docs/guides/platform/free-project-pausing) and [Vercel cron configuration](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
+
 ## Architecture
 
 ```text
