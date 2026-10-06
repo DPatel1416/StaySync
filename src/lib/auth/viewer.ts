@@ -1,4 +1,6 @@
 import "server-only";
+import { cookies } from "next/headers";
+import { activePropertyCookie, selectAuthorizedProperty } from "@/lib/property-scope";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,6 +19,7 @@ export type AuthenticatedViewer = {
   isSupervisor: boolean;
   accountKind: "EMPLOYEE" | "ACCOUNT_HOLDER";
   properties: ViewerProperty[];
+  activePropertyId?: string;
   permissions: Permission[];
 };
 
@@ -58,6 +61,9 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
     return { id: membership.property_id, name: property?.name ?? "Assigned property", isDefault: membership.is_default };
   }).sort((left, right) => Number(right.isDefault) - Number(left.isDefault));
 
+  if (profile.account_kind === "ACCOUNT_HOLDER" && !permissions.includes("MANAGE_USERS")) permissions.push("MANAGE_USERS");
+  const activePropertyId = selectAuthorizedProperty(properties, (await cookies()).get(activePropertyCookie)?.value)?.id;
+
   return {
     id: profile.id,
     organizationId: profile.organization_id,
@@ -68,6 +74,7 @@ export async function getAuthenticatedViewer(): Promise<AuthenticatedViewer | nu
     isSupervisor: workspace === "manager" || /supervisor|manager/i.test(profile.job_title ?? ""),
     accountKind: profile.account_kind,
     properties,
+    activePropertyId,
     permissions,
   };
 }

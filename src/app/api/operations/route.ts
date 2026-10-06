@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { selectAuthorizedProperty } from "@/lib/property-scope";
 import { getAuthenticatedViewer, type AuthenticatedViewer } from "@/lib/auth/viewer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Permission } from "@/lib/permissions";
@@ -33,7 +34,7 @@ function authorized(viewer: AuthenticatedViewer, permission?: Permission) {
 }
 
 async function context(viewer: AuthenticatedViewer, admin: Admin, requestedProperty?: string) {
-  const property = viewer.properties.find((item) => item.id === requestedProperty || item.name === requestedProperty) ?? viewer.properties[0];
+  const property = selectAuthorizedProperty(viewer.properties, viewer.activePropertyId, requestedProperty);
   if (!property) throw new Error("No authorized property is assigned to this account.");
   const { data: department } = await admin.from("departments").select("id, name").eq("organization_id", viewer.organizationId).eq("property_id", property.id).eq("code", viewer.workspace === "manager" ? "MANAGEMENT" : viewer.workspace.replace(/^department-/, "CUSTOM_").replace(/-/g, "_").toUpperCase()).is("archived_at", null).maybeSingle();
   return { property, department };
@@ -43,7 +44,7 @@ async function dictionaries(admin: Admin, viewer: AuthenticatedViewer) {
   const propertyIds = viewer.properties.map((item) => item.id);
   const [{ data: departments }, { data: users }] = await Promise.all([
     admin.from("departments").select("id, name").eq("organization_id", viewer.organizationId).in("property_id", propertyIds.length ? propertyIds : ["00000000-0000-0000-0000-000000000000"]).is("archived_at", null),
-    admin.from("users").select("id, display_name").eq("organization_id", viewer.organizationId).is("archived_at", null),
+    admin.from("users").select("id, display_name").eq("organization_id", viewer.organizationId),
   ]);
   return { departments: new Map((departments ?? []).map((item) => [item.id, item.name])), users: new Map((users ?? []).map((item) => [item.id, item.display_name])) };
 }
@@ -60,8 +61,9 @@ async function userId(admin: Admin, viewer: AuthenticatedViewer, propertyId: str
   return data?.id ?? null;
 }
 
-async function list(resource: string, viewer: AuthenticatedViewer, admin: Admin) {
-  const propertyIds = viewer.properties.map((item) => item.id);
+async function list(resource: string, viewer: AuthenticatedViewer, admin: Admin, requestedProperty?: string) {
+  const property = selectAuthorizedProperty(viewer.properties, viewer.activePropertyId, requestedProperty);
+  const propertyIds = property ? [property.id] : [];
   const scope = propertyIds.length ? propertyIds : ["00000000-0000-0000-0000-000000000000"];
   const names = await dictionaries(admin, viewer);
   if (resource === "departments") {
@@ -117,7 +119,7 @@ async function list(resource: string, viewer: AuthenticatedViewer, admin: Admin)
     return (data ?? []).map((row) => ({ id: row.id, title: row.item_description, detail: `Found in ${row.found_location} · Found ${row.found_at} · Stored in ${row.storage_location}`, foundAt: row.found_at.slice(0, 16), foundLocation: row.found_location, storageLocation: row.storage_location, status: statusLabel(row.guest_follow_up_status), tone: row.guest_follow_up_status === "NOT_STARTED" ? "warning" : "info", createdAt: Date.parse(row.created_at), createdBy: names.users.get(row.created_by) ?? "Team member" }));
   }
   if (resource === "notifications") {
-    const { data, error: queryError } = await admin.from("notifications").select("*").eq("user_id", viewer.id).is("archived_at", null).order("created_at", { ascending: false });
+    const { data, error: queryError } = await admin.from("notifications").select("*").eq("user_id", viewer.id).eq("organization_id", viewer.organizationId).in("property_id", scope).is("archived_at", null).order("created_at", { ascending: false });
     if (queryError) throw queryError;
     return (data ?? []).map((row) => ({ id: row.id, department: viewer.workspace === "manager" ? "Management" : viewer.workspace, title: row.title, message: row.body, serviceRequestId: row.entity_id ?? row.id, href: row.entity_type === "operation_log" ? `/app/${viewer.workspace}/operations-log` : undefined, createdAt: Date.parse(row.created_at), createdBy: "StaySync", readAt: row.read_at ? Date.parse(row.read_at) : undefined }));
   }
@@ -197,14 +199,14 @@ export async function POST(request: Request) {
         if (inserted.error || !inserted.data) throw inserted.error ?? new Error("The department score could not be created.");
         savedId = inserted.data.id;
       }
-      const records = await list(resource, viewer, admin);
+      const records = await list(resource, viewer, admin, ctx.property.id);
       const savedRecord = records.find((item: { id: string }) => item.id === savedId) as ({ previousScore?: number } & Record<string, unknown>) | undefined;
       return NextResponse.json({ record: currentScore && savedRecord && savedRecord.previousScore === undefined ? { ...savedRecord, previousScore: Number(currentScore.score) } : savedRecord }, { status: currentScore ? 200 : 201 });
     }
     else if (resource === "lost-found") { table = "lost_found_items"; values = { organization_id: viewer.organizationId, property_id: ctx.property.id, department_id: ctx.department?.id, item_description: record.title, found_location: record.foundLocation, found_at: record.foundAt, found_by: viewer.id, storage_location: record.storageLocation, guest_follow_up_status: enumValue(record.status, "NOT_STARTED"), created_by: viewer.id }; }
     else return error("Notifications are created by operational workflows.", 403);
     const { data, error: insertError } = await admin.from(table).insert(values).select("id").single(); if (insertError || !data) throw insertError;
-    const records = await list(resource, viewer, admin); return NextResponse.json({ record: records.find((item: { id: string }) => item.id === data.id) }, { status: 201 });
+    const records = await list(resource, viewer, admin, ctx.property.id); return NextResponse.json({ record: records.find((item: { id: string }) => item.id === data.id) }, { status: 201 });
   } catch { return error("The operational record could not be created.", 500); }
 }
 
@@ -236,7 +238,7 @@ export async function PATCH(request: Request) {
   };
   const target = mapping[resource];
   let query = admin.from(target.table).update(target.values).eq("id", record.id).eq(resource === "notifications" ? "user_id" : "organization_id", resource === "notifications" ? viewer.id : viewer.organizationId);
-  if (resource !== "notifications") query.eq("property_id", ctx.property.id);
+  query.eq("property_id", ctx.property.id);
   let { error: updateError } = await query;
   if (resource === "department-scores" && isMissingPreviousScore(updateError)) {
     const compatibleValues = { ...target.values };
@@ -245,7 +247,7 @@ export async function PATCH(request: Request) {
     ({ error: updateError } = await query);
   }
   if (updateError) return error("The operational record could not be updated.", 500);
-  const records = await list(resource, viewer, admin);
+  const records = await list(resource, viewer, admin, ctx.property.id);
   const savedRecord = records.find((item: { id: string }) => item.id === record.id) ?? record;
   return NextResponse.json({ record: resource === "department-scores" && savedRecord.previousScore === undefined ? { ...savedRecord, previousScore: record.previousScore } : savedRecord });
 }
@@ -255,7 +257,16 @@ export async function DELETE(request: Request) {
   const viewer = await getAuthenticatedViewer(); if (!viewer) return error("Your session has expired. Please sign in again.", 401);
   const body = await request.json().catch(() => null); if (!body?.id) return error("A record ID is required.");
   const tables: Record<string, string> = { "service-requests": "service_requests", incidents: "incidents", "work-orders": "work_orders", "room-updates": "room_status_updates", "housekeeping-rooms": "room_status_updates", "operation-logs": "operation_logs", "department-scores": "department_scores", "lost-found": "lost_found_items" };
-  const { error: deleteError } = await createAdminClient().from(tables[resource]).update({ archived_at: new Date().toISOString() }).eq("id", body.id).eq("organization_id", viewer.organizationId);
+  if (!tables[resource]) return error("That resource cannot be deleted.");
+  if (!authorized(viewer, createPermissions[resource])) return error("You do not have permission to delete this record.", 403);
+  const property = selectAuthorizedProperty(viewer.properties, viewer.activePropertyId);
+  if (!property) return error("No authorized property is assigned to this account.", 403);
+  const admin = createAdminClient();
+  if (resource === "operation-logs") {
+    const { data: log } = await admin.from("operation_logs").select("author_id, created_at").eq("id", body.id).eq("organization_id", viewer.organizationId).eq("property_id", property.id).maybeSingle();
+    if (!log || log.author_id !== viewer.id || Date.now() - Date.parse(log.created_at) > 15 * 60 * 1000) return error("Operation logs can only be deleted by their author within 15 minutes.", 403);
+  }
+  const { error: deleteError } = await admin.from(tables[resource]).update({ archived_at: new Date().toISOString() }).eq("id", body.id).eq("organization_id", viewer.organizationId).eq("property_id", property.id);
   if (deleteError) return error("The operational record could not be removed.", 500);
   return NextResponse.json({ deleted: true });
 }

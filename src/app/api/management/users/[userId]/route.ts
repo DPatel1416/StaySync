@@ -55,13 +55,14 @@ export async function DELETE(_request: Request, context: { params: Promise<{ use
   const access = await requireManagementPermission("MANAGE_USERS");
   if ("error" in access) return access.error;
   const { userId } = await context.params;
-  if (userId === access.viewer.id) return NextResponse.json({ error: "You cannot suspend your own account." }, { status: 400 });
+  if (userId === access.viewer.id) return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
   const admin = createAdminClient();
   const employee = await editableEmployee(admin, access.viewer.organizationId, userId);
   if (!employee) return NextResponse.json({ error: "That employee account was not found." }, { status: 404 });
+  // Archive instead of removing the referenced profile so historical activity remains intact.
   const { error: authError } = await admin.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
-  if (authError) return NextResponse.json({ error: "The employee sign-in could not be suspended." }, { status: 500 });
+  if (authError) return NextResponse.json({ error: "The employee sign-in could not be deleted." }, { status: 500 });
   const { error } = await admin.from("users").update({ is_active: false, archived_at: new Date().toISOString() }).eq("id", userId).eq("organization_id", access.viewer.organizationId);
-  if (error) return NextResponse.json({ error: "The employee profile could not be suspended." }, { status: 500 });
-  return NextResponse.json({ suspended: true });
+  if (error) return NextResponse.json({ error: "The employee profile could not be deleted." }, { status: 500 });
+  return NextResponse.json({ deleted: true });
 }
